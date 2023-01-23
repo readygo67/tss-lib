@@ -29,6 +29,15 @@ func newRound1(params *tss.Parameters, key *keygen.LocalPartySaveData, data *com
 		&base{params, key, data, temp, out, end, make([]bool, len(params.Parties().IDs())), false, 1}}
 }
 
+// round1,party[i] 随机产生k 和gamma, 并将k 通过mta 发送给party[j]
+// round2, party[j] 将从party[i] 传过来的k[i] 和本地的gamma[j] 以及w[j] 相乘，然后随机选择-beta[j]，v[j] 并将 k[i] * gamma[j] - beta[j], k[i]*w[i] - v[j]的密文发送给party[i]
+// round3, party[i] 将收集到的 (k[i] * gamma[j] - beta[j], k[i]*w[j] - v[j]) 计算得到自己的theta[i],sigmma[i], 并将theta[i] 广播出去
+// round4, party[i] 收集到所有的theta[i]之后，计算 k * gamma = Sum(theta[i]), 并将本地gamma[i] 将gamma的ZKP 和 commitment 广播
+// round5, party[i] 验证gamma[j]的proof之后，获得r, s[i], 计算s[i] 的proof并广播
+// round6/7/8，party[i] 交互s[i]的proof
+// round9 将party[i] 的s[i]广播出去。
+// finalize，将Sum(s[i]) 汇总形成签名s。
+
 func (round *round1) Start() *tss.Error {
 	if round.started {
 		return round.WrapError(errors.New("round already started"))
@@ -59,20 +68,20 @@ func (round *round1) Start() *tss.Error {
 	i := round.PartyID().Index
 	round.ok[i] = true
 
-	for j, Pj := range round.Parties().IDs() {
+	for j, Pj := range round.Parties().IDs() { // partyi 给partyj 发送 mta
 		if j == i {
 			continue
 		}
-		cA, pi, err := mta.AliceInit(round.Params().EC(), round.key.PaillierPKs[i], k, round.key.NTildej[j], round.key.H1j[j], round.key.H2j[j])
+		cA, pi, err := mta.AliceInit(round.Params().EC(), round.key.PaillierPKs[i], k, round.key.NTildej[j], round.key.H1j[j], round.key.H2j[j]) // 将ki 发送给 party[j]
 		if err != nil {
 			return round.WrapError(fmt.Errorf("failed to init mta: %v", err))
 		}
-		r1msg1 := NewSignRound1Message1(Pj, round.PartyID(), cA, pi)
-		round.temp.cis[j] = cA
+		r1msg1 := NewSignRound1Message1(Pj, round.PartyID(), cA, pi) // to Pj, from: Partyi, cA 为密文， pi 为cA的proof。
+		round.temp.cis[j] = cA                                       // cis[j] 记录发给partyj 的密文。
 		round.out <- r1msg1
 	}
 
-	r1msg2 := NewSignRound1Message2(round.PartyID(), cmt.C)
+	r1msg2 := NewSignRound1Message2(round.PartyID(), cmt.C) // 广播g^gamma[i]
 	round.temp.signRound1Message2s[i] = r1msg2
 	round.out <- r1msg2
 
@@ -96,6 +105,7 @@ func (round *round1) Update() (bool, *tss.Error) {
 	return true, nil
 }
 
+// 看消息的类型是否正确，看消息的广播属性是否正确，如果两者都正确，
 func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
 	if _, ok := msg.Content().(*SignRound1Message1); ok {
 		return !msg.IsBroadcast()

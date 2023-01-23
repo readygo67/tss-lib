@@ -60,6 +60,7 @@ func NewKGRound1Message(
 		Dlnproof_1: dlnProof1Bz,
 		Dlnproof_2: dlnProof2Bz,
 	}
+	// content 既在messagewrapper 中又在msg 中。
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg), nil
 }

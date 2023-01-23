@@ -19,13 +19,17 @@ const (
 	paillierBitsLen = 2048
 )
 
+// round2 发送两个消息，
+// r2msg1: 把ui的share[j] 发送Pj
+// r2msg2: 把
+
 func (round *round2) Start() *tss.Error {
 	if round.started {
 		return round.WrapError(errors.New("round already started"))
 	}
 	round.number = 2
 	round.started = true
-	round.resetOK()
+	round.resetOK() // resetok数组，标明没有收到其他parties 的消息。
 
 	common.Logger.Debugf(
 		"%s Setting up DLN verification with concurrency level of %d",
@@ -89,7 +93,7 @@ func (round *round2) Start() *tss.Error {
 			return round.WrapError(errors.New("dln proof verification failed"), culprit)
 		}
 	}
-	// save NTilde_j, h1_j, h2_j, ...
+	// save NTilde_j, h1_j, h2_j, ..., 在round1中收到其他parties过来的消息，验证过后
 	for j, msg := range round.temp.kgRound1Messages {
 		if j == i {
 			continue
@@ -107,7 +111,7 @@ func (round *round2) Start() *tss.Error {
 		round.temp.KGCs[j] = KGC
 	}
 
-	// 5. p2p send share ij to Pj
+	// 5. p2p send share ui 的share[j] to Pj， 将本地ui 的share[(ids[i], f(ids))]发给peer
 	shares := round.temp.shares
 	for j, Pj := range round.Parties().IDs() {
 		r2msg1 := NewKGRound2Message1(Pj, round.PartyID(), shares[j])
@@ -119,7 +123,8 @@ func (round *round2) Start() *tss.Error {
 		round.out <- r2msg1
 	}
 
-	// 7. BROADCAST de-commitments of Shamir poly*G
+	// 7. BROADCAST de-commitments of Shamir poly*G,
+	// deCommitPolyG 是vs[0] =[r, g^a0, g^a1, g^a2] 的多项式
 	r2msg2 := NewKGRound2Message2(round.PartyID(), round.temp.deCommitPolyG)
 	round.temp.kgRound2Message2s[i] = r2msg2
 	round.out <- r2msg2

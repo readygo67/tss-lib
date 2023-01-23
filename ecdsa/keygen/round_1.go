@@ -40,11 +40,16 @@ func (round *round1) Start() *tss.Error {
 	i := Pi.Index
 
 	// 1. calculate "partial" key share ui
+	// 随机产生部分私钥
 	ui := common.GetRandomPositiveInt(round.Params().EC().Params().N)
 
 	round.temp.ui = ui
 
 	// 2. compute the vss shares
+	// f(x) = a0 + a1*x + a2*x^2 + ....
+	// vs[0] = g^a0, vs[1] = g^a1, vs[i] = g^ai, 2个 commitment
+	// shares = {xi, f(xi)}
+	// 把ui 通过一个多项式fa(x), 得到share fa(ids[0]), fa(ids[1]), fa(ids[2])
 	ids := round.Parties().IDs().Keys()
 	vs, shares, err := vss.Create(round.Params().EC(), round.Threshold(), ui, ids)
 	if err != nil {
@@ -57,10 +62,14 @@ func (round *round1) Start() *tss.Error {
 	_ = ui    // silences a linter warning
 
 	// make commitment -> (C, D)
+	// 将vs[0] = g ^a0, vs[1] = g^a1, 变成 变成[]*big.Int数组
 	pGFlat, err := crypto.FlattenECPoints(vs)
 	if err != nil {
 		return round.WrapError(err, Pi)
 	}
+
+	// 将vs[0] = g ^a0, vs[1] = g^a1, 变成 变成[]*big.Int数组 再做一个commitment.
+	// pGFlat = [r, vs[0], vs[1], vs[2].....]
 	cmt := cmts.NewHashCommitment(pGFlat...)
 
 	// 4. generate Paillier public key E_i, private key and proof
@@ -102,7 +111,7 @@ func (round *round1) Start() *tss.Error {
 	// - our set of Shamir shares
 	round.save.ShareID = ids[i]
 	round.temp.vs = vs
-	round.temp.shares = shares
+	round.temp.shares = shares // [](xi, f(xi))
 
 	// for this P: SAVE de-commitments, paillier keys for round 2
 	round.save.PaillierSK = preParams.PaillierSK
@@ -143,6 +152,7 @@ func (round *round1) Update() (bool, *tss.Error) {
 	return true, nil
 }
 
+// NextRound 将round 变量变成下一轮的round
 func (round *round1) NextRound() tss.Round {
 	round.started = false
 	return &round2{round}

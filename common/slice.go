@@ -10,6 +10,7 @@ import (
 	"math/big"
 )
 
+// TODO(keep),将bigInt 的数组转换成 byte的二维数组
 func BigIntsToBytes(bigInts []*big.Int) [][]byte {
 	bzs := make([][]byte, len(bigInts))
 	for i := range bzs {

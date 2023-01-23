@@ -39,7 +39,7 @@ type (
 	}
 
 	localMessageStore struct {
-		signRound1Message1s,
+		signRound1Message1s, //
 		signRound1Message2s,
 		signRound2Messages,
 		signRound3Messages,

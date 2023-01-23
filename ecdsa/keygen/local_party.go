@@ -35,6 +35,7 @@ type (
 		end chan<- LocalPartySaveData
 	}
 
+	// 保存自己以及其他parties过来的message
 	localMessageStore struct {
 		kgRound1Messages,
 		kgRound2Message1s,

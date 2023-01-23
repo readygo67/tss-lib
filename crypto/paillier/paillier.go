@@ -99,6 +99,7 @@ func GenerateKeyPair(ctx context.Context, modulusBitLen int, optionalConcurrency
 	phiN := new(big.Int).Mul(PMinus1, QMinus1)
 
 	// lambdaN = lcm(P−1, Q−1)
+	// (P-1, Q-1)的最小公倍数= [(P-1)*(Q-1)]/GCD[(P-1),(Q-1)]
 	gcd := new(big.Int).GCD(nil, nil, PMinus1, QMinus1)
 	lambdaN := new(big.Int).Div(phiN, gcd)
 
@@ -115,9 +116,9 @@ func (publicKey *PublicKey) EncryptAndReturnRandomness(m *big.Int) (c *big.Int, 
 	}
 	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
 	N2 := publicKey.NSquare()
-	// 1. gamma^m mod N2
+	// 1. gamma^m mod N2, Gm = (1+N)^m
 	Gm := new(big.Int).Exp(publicKey.Gamma(), m, N2)
-	// 2. x^N mod N2
+	// 2. x^N mod N2, xN = x^N
 	xN := new(big.Int).Exp(x, publicKey.N, N2)
 	// 3. (1) * (2) mod N2
 	c = common.ModInt(N2).Mul(Gm, xN)
@@ -129,6 +130,7 @@ func (publicKey *PublicKey) Encrypt(m *big.Int) (c *big.Int, err error) {
 	return
 }
 
+// 密文 与明文的乘法，
 func (publicKey *PublicKey) HomoMult(m, c1 *big.Int) (*big.Int, error) {
 	if m.Cmp(zero) == -1 || m.Cmp(publicKey.N) != -1 { // m < 0 || m >= N ?
 		return nil, ErrMessageTooLong
@@ -141,6 +143,7 @@ func (publicKey *PublicKey) HomoMult(m, c1 *big.Int) (*big.Int, error) {
 	return common.ModInt(N2).Exp(c1, m), nil
 }
 
+// 密文与密文的的加法 等于
 func (publicKey *PublicKey) HomoAdd(c1, c2 *big.Int) (*big.Int, error) {
 	N2 := publicKey.NSquare()
 	if c1.Cmp(zero) == -1 || c1.Cmp(N2) != -1 { // c1 < 0 || c1 >= N2 ?
@@ -163,6 +166,7 @@ func (publicKey *PublicKey) AsInts() []*big.Int {
 }
 
 // Gamma returns N+1
+// 返回g=n+1
 func (publicKey *PublicKey) Gamma() *big.Int {
 	return new(big.Int).Add(publicKey.N, one)
 }
@@ -193,7 +197,7 @@ func (privateKey *PrivateKey) Decrypt(c *big.Int) (m *big.Int, err error) {
 // Proof is an implementation of Gennaro, R., Micciancio, D., Rabin, T.:
 // An efficient non-interactive statistical zero-knowledge proof system for quasi-safe prime products.
 // In: In Proc. of the 5th ACM Conference on Computer and Communications Security (CCS-98. Citeseer (1998)
-
+// TODO（keep), 每一个参与方产生paillier key N, 并将N的NIZK 证明一起发送给 其他的参与方，根据随机数k产生13个256bits
 func (privateKey *PrivateKey) Proof(k *big.Int, ecdsaPub *crypto2.ECPoint) Proof {
 	var pi Proof
 	iters := ProofIters
@@ -252,6 +256,7 @@ func L(u, N *big.Int) *big.Int {
 }
 
 // GenerateXs generates the challenges used in Paillier key Proof
+// 产生13个
 func GenerateXs(m int, k, N *big.Int, ecdsaPub *crypto2.ECPoint) []*big.Int {
 	var i, n int
 	ret := make([]*big.Int, m)
@@ -259,7 +264,7 @@ func GenerateXs(m int, k, N *big.Int, ecdsaPub *crypto2.ECPoint) []*big.Int {
 	kb, sXb, sYb, Nb := k.Bytes(), sX.Bytes(), sY.Bytes(), N.Bytes()
 	bits := N.BitLen()
 	blocks := int(gmath.Ceil(float64(bits) / 256))
-	chs := make([]chan []byte, blocks)
+	chs := make([]chan []byte, blocks) // []byte 数组的chan
 	for k := range chs {
 		chs[k] = make(chan []byte)
 	}

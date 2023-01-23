@@ -32,6 +32,7 @@ var (
 	one = big.NewInt(1)
 )
 
+// 产生关于 h1,h2 的一个proof。
 func NewDLNProof(h1, h2, x, p, q, N *big.Int) *Proof {
 	pMulQ := new(big.Int).Mul(p, q)
 	modN, modPQ := common.ModInt(N), common.ModInt(pMulQ)
@@ -39,18 +40,18 @@ func NewDLNProof(h1, h2, x, p, q, N *big.Int) *Proof {
 	alpha := [Iterations]*big.Int{}
 	for i := range alpha {
 		a[i] = common.GetRandomPositiveInt(pMulQ)
-		alpha[i] = modN.Exp(h1, a[i])
+		alpha[i] = modN.Exp(h1, a[i]) // h1^a[i] mod N
 	}
-	msg := append([]*big.Int{h1, h2, N}, alpha[:]...)
-	c := common.SHA512_256i(msg...)
+	msg := append([]*big.Int{h1, h2, N}, alpha[:]...) // 获得msg
+	c := common.SHA512_256i(msg...)                   // 得到msg的hash
 	t := [Iterations]*big.Int{}
 	cIBI := new(big.Int)
 	for i := range t {
 		cI := c.Bit(i)
 		cIBI = cIBI.SetInt64(int64(cI))
-		t[i] = modPQ.Add(a[i], modPQ.Mul(cIBI, x))
+		t[i] = modPQ.Add(a[i], modPQ.Mul(cIBI, x)) // t[i]= a[i] + 0/1 * x
 	}
-	return &Proof{alpha, t}
+	return &Proof{alpha, t} // alpha[i] = g^ai 作为， t[i]也包含a[i], x 的信息
 }
 
 func (p *Proof) Verify(h1, h2, N *big.Int) bool {
@@ -62,7 +63,7 @@ func (p *Proof) Verify(h1, h2, N *big.Int) bool {
 	}
 	modN := common.ModInt(N)
 	h1_ := new(big.Int).Mod(h1, N)
-	if h1_.Cmp(one) != 1 || h1_.Cmp(N) != -1 {
+	if h1_.Cmp(one) != 1 || h1_.Cmp(N) != -1 { // h1
 		return false
 	}
 	h2_ := new(big.Int).Mod(h2, N)

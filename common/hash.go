@@ -68,8 +68,8 @@ func SHA512_256i(in ...*big.Int) *big.Int {
 		ptrs[i] = n.Bytes()
 		bzSize += len(ptrs[i])
 	}
-	data = make([]byte, 0, len(inLenBz)+bzSize+inLen)
-	data = append(data, inLenBz...)
+	data = make([]byte, 0, len(inLenBz)+bzSize+inLen) // inNumber.Bytes() + in[0].Bytes() + "$" + in[1].Bytes() + "$" + in[2].Bytes() + "$"
+	data = append(data, inLenBz...)                   // 将in的len 放入
 	for i := range in {
 		data = append(data, ptrs[i]...)
 		data = append(data, hashInputDelimiter) // safety delimiter

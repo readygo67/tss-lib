@@ -27,6 +27,7 @@ type (
 )
 
 // NewZKProof constructs a new Schnorr ZK proof of knowledge of the discrete logarithm (GG18Spec Fig. 16)
+// x: 为秘密
 func NewZKProof(x *big.Int, X *crypto.ECPoint) (*ZKProof, error) {
 	if x == nil || X == nil || !X.ValidateBasic() {
 		return nil, errors.New("ZKProof constructor received nil or invalid value(s)")
@@ -36,21 +37,23 @@ func NewZKProof(x *big.Int, X *crypto.ECPoint) (*ZKProof, error) {
 	q := ecParams.N
 	g := crypto.NewECPointNoCurveCheck(ec, ecParams.Gx, ecParams.Gy) // already on the curve.
 
-	a := common.GetRandomPositiveInt(q)
-	alpha := crypto.ScalarBaseMult(ec, a)
+	a := common.GetRandomPositiveInt(q)   // 随机数r
+	alpha := crypto.ScalarBaseMult(ec, a) // R = r*G
 
 	var c *big.Int
 	{
-		cHash := common.SHA512_256i(X.X(), X.Y(), g.X(), g.Y(), alpha.X(), alpha.Y())
-		c = common.RejectionSample(q, cHash)
+		cHash := common.SHA512_256i(X.X(), X.Y(), g.X(), g.Y(), alpha.X(), alpha.Y()) // c = hash(PK, R)
+		c = common.RejectionSample(q, cHash)                                          // 将hash转换成一个big.Int
 	}
-	t := new(big.Int).Mul(c, x)
-	t = common.ModInt(q).Add(a, t)
 
-	return &ZKProof{Alpha: alpha, T: t}, nil
+	t := new(big.Int).Mul(c, x)    // z= c*x
+	t = common.ModInt(q).Add(a, t) // z= a + c*x
+
+	return &ZKProof{Alpha: alpha, T: t}, nil // Alpha = R= r*G, t=z, 即将(R,z) 作为NIZK的proof 发送给
 }
 
 // NewZKProof verifies a new Schnorr ZK proof of knowledge of the discrete logarithm (GG18Spec Fig. 16)
+// X: 为公钥PK
 func (pf *ZKProof) Verify(X *crypto.ECPoint) bool {
 	if pf == nil || !pf.ValidateBasic() {
 		return false
@@ -65,8 +68,9 @@ func (pf *ZKProof) Verify(X *crypto.ECPoint) bool {
 		cHash := common.SHA512_256i(X.X(), X.Y(), g.X(), g.Y(), pf.Alpha.X(), pf.Alpha.Y())
 		c = common.RejectionSample(q, cHash)
 	}
-	tG := crypto.ScalarBaseMult(ec, pf.T)
-	Xc := X.ScalarMult(c)
+	tG := crypto.ScalarBaseMult(ec, pf.T) // z*G
+
+	Xc := X.ScalarMult(c) // c*PK
 	aXc, err := pf.Alpha.Add(Xc)
 	if err != nil {
 		return false

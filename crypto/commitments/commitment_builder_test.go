@@ -7,6 +7,7 @@
 package commitments
 
 import (
+	"fmt"
 	"math/big"
 	"reflect"
 	"testing"
@@ -151,4 +152,16 @@ func TestParseSecrets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuilder_Secrets(t *testing.T) {
+	b := NewBuilder()
+	b.AddPart([]*big.Int{big.NewInt(1), big.NewInt(2), big.NewInt(3)})
+	b.AddPart([]*big.Int{big.NewInt(4), big.NewInt(5), big.NewInt(6), big.NewInt(7)})
+	s, _ := b.Secrets()
+	gots, _ := ParseSecrets(s)
+	for _, got := range gots {
+		fmt.Println(got)
+	}
+
 }

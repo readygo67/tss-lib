@@ -170,7 +170,7 @@ func TestE2EConcurrentAndSaveFixtures(t *testing.T) {
 	setUp("info")
 
 	// tss.SetCurve(elliptic.P256())
-
+	// 产生20个IDs
 	threshold := testThreshold
 	fixtures, pIDs, err := LoadKeygenTestFixtures(testParticipants)
 	if err != nil {

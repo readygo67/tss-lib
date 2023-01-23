@@ -19,10 +19,12 @@ var (
 	two  = big.NewInt(2)
 )
 
+// TODO(keep), 将bigInt转换成ModInt
 func ModInt(mod *big.Int) *modInt {
 	return (*modInt)(mod)
 }
 
+// (x+y) mod (mi)
 func (mi *modInt) Add(x, y *big.Int) *big.Int {
 	i := new(big.Int)
 	i.Add(x, y)

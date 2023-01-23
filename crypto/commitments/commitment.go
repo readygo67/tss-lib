@@ -29,6 +29,7 @@ type (
 	}
 )
 
+// 构建一个commitment。
 func NewHashCommitmentWithRandomness(r *big.Int, secrets ...*big.Int) *HashCommitDecommit {
 	parts := make([]*big.Int, len(secrets)+1)
 	parts[0] = r
@@ -39,15 +40,17 @@ func NewHashCommitmentWithRandomness(r *big.Int, secrets ...*big.Int) *HashCommi
 
 	cmt := &HashCommitDecommit{}
 	cmt.C = hash
-	cmt.D = parts
+	cmt.D = parts // TODO(keep), 随机数r，也包含在parts中。
 	return cmt
 }
 
+// TODO(keep), 多个secret 加上一个随机数生成commitment.
 func NewHashCommitment(secrets ...*big.Int) *HashCommitDecommit {
 	r := common.MustGetRandomInt(HashLength) // r
 	return NewHashCommitmentWithRandomness(r, secrets...)
 }
 
+// 从[][]byte 数组 得到[]*big.Int数组。
 func NewHashDeCommitmentFromBytes(marshalled [][]byte) HashDeCommitment {
 	return common.MultiBytesToBigInts(marshalled)
 }

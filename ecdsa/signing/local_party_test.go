@@ -39,7 +39,7 @@ func TestE2EConcurrent(t *testing.T) {
 	setUp("info")
 	threshold := testThreshold
 
-	// PHASE: load keygen fixtures
+	// PHASE: load keygen fixtures,挑选11个parties
 	keys, signPIDs, err := keygen.LoadKeygenTestFixturesRandomSet(testThreshold+1, testParticipants)
 	assert.NoError(t, err, "should load keygen fixtures")
 	assert.Equal(t, testThreshold+1, len(keys))

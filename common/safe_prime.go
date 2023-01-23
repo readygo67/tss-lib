@@ -21,10 +21,11 @@ const (
 	primeTestN = 30
 )
 
+// TODO(keep), 寻找两个质数p,q，且p = 2q + 1.
 type (
 	GermainSafePrime struct {
 		q,
-		p *big.Int // p = 2q + 1
+		p *big.Int // p = 2q + 1,
 	}
 )
 

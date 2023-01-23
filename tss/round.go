@@ -6,6 +6,7 @@
 
 package tss
 
+// Round interface
 type Round interface {
 	Params() *Parameters
 	Start() *Error

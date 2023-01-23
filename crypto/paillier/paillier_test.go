@@ -75,6 +75,7 @@ func TestEncryptDecrypt(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// 密文与明文的乘法(HomoAdd)= 明文乘明文
 func TestHomoMul(t *testing.T) {
 	setUp(t)
 	three, err := privateKey.Encrypt(big.NewInt(3))
@@ -83,7 +84,7 @@ func TestHomoMul(t *testing.T) {
 	// for HomoMul, the first argument `m` is not ciphered
 	six := big.NewInt(6)
 
-	cm, err := privateKey.HomoMult(six, three)
+	cm, err := privateKey.HomoMult(six, three) // 密文与明文的乘法 = 明文 * 明文
 	assert.NoError(t, err)
 	multiple, err := privateKey.Decrypt(cm)
 	assert.NoError(t, err)
@@ -93,6 +94,7 @@ func TestHomoMul(t *testing.T) {
 	assert.Equal(t, 0, multiple.Cmp(big.NewInt(exp)))
 }
 
+// 密文与密文的加法(HomoAdd)= 明文加明文
 func TestHomoAdd(t *testing.T) {
 	setUp(t)
 	num1 := big.NewInt(10)

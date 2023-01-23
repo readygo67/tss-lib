@@ -61,6 +61,7 @@ func (round *base) CanProceed() bool {
 	if !round.started {
 		return false
 	}
+	// 收到了所有parties的消息之后才能proceed.
 	for _, ok := range round.ok {
 		if !ok {
 			return false

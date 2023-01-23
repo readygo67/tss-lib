@@ -108,13 +108,13 @@ func (round *round3) Start() *tss.Error {
 		if j == round.PartyID().Index {
 			continue
 		}
-		thelta = modN.Add(thelta, alphas[j].Add(alphas[j], round.temp.betas[j]))
-		sigma = modN.Add(sigma, us[j].Add(us[j], round.temp.vs[j]))
+		thelta = modN.Add(thelta, alphas[j].Add(alphas[j], round.temp.betas[j])) // k*gamma = Sum(ki*gammai, alapha[i][i] + beta[j][i])
+		sigma = modN.Add(sigma, us[j].Add(us[j], round.temp.vs[j]))              // k*w = Sum(ki*wi,u[i][i],v[j][i])
 	}
 
 	round.temp.theta = thelta
 	round.temp.sigma = sigma
-	r3msg := NewSignRound3Message(round.PartyID(), thelta)
+	r3msg := NewSignRound3Message(round.PartyID(), thelta) // round3 公布
 	round.temp.signRound3Messages[round.PartyID().Index] = r3msg
 	round.out <- r3msg
 

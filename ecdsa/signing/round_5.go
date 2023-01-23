@@ -30,11 +30,11 @@ func (round *round5) Start() *tss.Error {
 		if j == round.PartyID().Index {
 			continue
 		}
-		r1msg2 := round.temp.signRound1Message2s[j].Content().(*SignRound1Message2)
+		r1msg2 := round.temp.signRound1Message2s[j].Content().(*SignRound1Message2) // r1msg2 是 g^gamma[j] 的commit.C
 		r4msg := round.temp.signRound4Messages[j].Content().(*SignRound4Message)
 		SCj, SDj := r1msg2.UnmarshalCommitment(), r4msg.UnmarshalDeCommitment()
 		cmtDeCmt := commitments.HashCommitDecommit{C: SCj, D: SDj}
-		ok, bigGammaJ := cmtDeCmt.DeCommit()
+		ok, bigGammaJ := cmtDeCmt.DeCommit() // bigGammaJ
 		if !ok || len(bigGammaJ) != 2 {
 			return round.WrapError(errors.New("commitment verify failed"), Pj)
 		}
@@ -56,12 +56,13 @@ func (round *round5) Start() *tss.Error {
 		}
 	}
 
+	//
 	R = R.ScalarMult(round.temp.thetaInverse)
 	N := round.Params().EC().Params().N
 	modN := common.ModInt(N)
 	rx := R.X()
 	ry := R.Y()
-	si := modN.Add(modN.Mul(round.temp.m, round.temp.k), modN.Mul(rx, round.temp.sigma))
+	si := modN.Add(modN.Mul(round.temp.m, round.temp.k), modN.Mul(rx, round.temp.sigma)) // 计算得到s[i]
 
 	// clear temp.w and temp.k from memory, lint ignore
 	round.temp.w = zero
@@ -69,16 +70,16 @@ func (round *round5) Start() *tss.Error {
 
 	li := common.GetRandomPositiveInt(N)  // li
 	roI := common.GetRandomPositiveInt(N) // pi
-	rToSi := R.ScalarMult(si)
+	rToSi := R.ScalarMult(si)             // 将si
 	liPoint := crypto.ScalarBaseMult(round.Params().EC(), li)
 	bigAi := crypto.ScalarBaseMult(round.Params().EC(), roI)
-	bigVi, err := rToSi.Add(liPoint)
+	bigVi, err := rToSi.Add(liPoint) // 将si
 	if err != nil {
 		return round.WrapError(errors2.Wrapf(err, "rToSi.Add(li)"))
 	}
 
 	cmt := commitments.NewHashCommitment(bigVi.X(), bigVi.Y(), bigAi.X(), bigAi.Y())
-	r5msg := NewSignRound5Message(round.PartyID(), cmt.C)
+	r5msg := NewSignRound5Message(round.PartyID(), cmt.C) // 广播s[i]的commithash.
 	round.temp.signRound5Messages[round.PartyID().Index] = r5msg
 	round.out <- r5msg
 

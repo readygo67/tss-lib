@@ -119,16 +119,16 @@ consumer:
 	logProgressTicker.Stop()
 
 	P, Q := sgps[0].SafePrime(), sgps[1].SafePrime()
-	NTildei := new(big.Int).Mul(P, Q)
+	NTildei := new(big.Int).Mul(P, Q) // (2p + 1) * (2q + 1)
 	modNTildeI := common.ModInt(NTildei)
 
 	p, q := sgps[0].Prime(), sgps[1].Prime()
-	modPQ := common.ModInt(new(big.Int).Mul(p, q))
+	modPQ := common.ModInt(new(big.Int).Mul(p, q)) // p * 1
 	f1 := common.GetRandomPositiveRelativelyPrimeInt(NTildei)
 	alpha := common.GetRandomPositiveRelativelyPrimeInt(NTildei)
-	beta := modPQ.ModInverse(alpha)
-	h1i := modNTildeI.Mul(f1, f1)
-	h2i := modNTildeI.Exp(h1i, alpha)
+	beta := modPQ.ModInverse(alpha)   // beta = 1/alaph
+	h1i := modNTildeI.Mul(f1, f1)     // h1 = f1^2
+	h2i := modNTildeI.Exp(h1i, alpha) // h2 = h1 ^ alpha
 
 	preParams := &LocalPreParams{
 		PaillierSK: paiSK,

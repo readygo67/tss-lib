@@ -19,9 +19,9 @@ import (
 
 func TestSchnorrProof(t *testing.T) {
 	q := tss.EC().Params().N
-	u := common.GetRandomPositiveInt(q)
-	uG := crypto.ScalarBaseMult(tss.EC(), u)
-	proof, _ := NewZKProof(u, uG)
+	u := common.GetRandomPositiveInt(q)      // 私钥:x
+	uG := crypto.ScalarBaseMult(tss.EC(), u) // 公钥:x*G
+	proof, _ := NewZKProof(u, uG)            // 产生x的NIZK。
 
 	assert.True(t, proof.Alpha.IsOnCurve())
 	assert.NotZero(t, proof.Alpha.X())
@@ -48,9 +48,12 @@ func TestSchnorrProofVerifyBadX(t *testing.T) {
 	X2 := crypto.ScalarBaseMult(tss.EC(), u2)
 
 	proof, _ := NewZKProof(u2, X2)
-	res := proof.Verify(X)
+	res := proof.Verify(X) // 实际公钥是X2
 
 	assert.False(t, res, "verify result must be false")
+
+	res = proof.Verify(X2) // 实际公钥是X2
+	assert.True(t, res, "verify result must be true")
 }
 
 func TestSchnorrVProofVerify(t *testing.T) {

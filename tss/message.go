@@ -79,6 +79,7 @@ var (
 // ----- //
 
 // NewMessageWrapper constructs a MessageWrapper from routing metadata and content
+// 从路由信息和内容组成messageWrapper,
 func NewMessageWrapper(routing MessageRouting, content MessageContent) *MessageWrapper {
 	// marshal the content to the ProtoBuf Any type
 	any, _ := anypb.New(content)

@@ -17,6 +17,7 @@ const (
 	MaxPartSize = int64(1 * 1024 * 1024) // 1 MB - rather liberal
 )
 
+// 将多个[][]big.Int 压缩成[]big.Int
 type builder struct {
 	parts [][]*big.Int
 }
@@ -36,6 +37,7 @@ func (b *builder) AddPart(part []*big.Int) *builder {
 	return b
 }
 
+// 将builder中的parts 提取出来，变成[]big.Int 数组
 func (b *builder) Secrets() ([]*big.Int, error) {
 	secretsLen := 0
 	if len(b.parts) > PartsCap {

@@ -36,17 +36,17 @@ func (round *round4) Start() *tss.Error {
 		}
 		r3msg := round.temp.signRound3Messages[j].Content().(*SignRound3Message)
 		theltaJ := r3msg.GetTheta()
-		thetaInverse = modN.Add(thetaInverse, new(big.Int).SetBytes(theltaJ))
+		thetaInverse = modN.Add(thetaInverse, new(big.Int).SetBytes(theltaJ)) // k*gamma = Sum(theta[i])
 	}
 
 	// compute the multiplicative inverse thelta mod q
 	thetaInverse = modN.ModInverse(thetaInverse)
-	piGamma, err := schnorr.NewZKProof(round.temp.gamma, round.temp.pointGamma)
+	piGamma, err := schnorr.NewZKProof(round.temp.gamma, round.temp.pointGamma) // 生成gamma的proof
 	if err != nil {
 		return round.WrapError(errors2.Wrapf(err, "NewZKProof(gamma, bigGamma)"))
 	}
 	round.temp.thetaInverse = thetaInverse
-	r4msg := NewSignRound4Message(round.PartyID(), round.temp.deCommit, piGamma)
+	r4msg := NewSignRound4Message(round.PartyID(), round.temp.deCommit, piGamma) // 将gamma的ZKP 和 commitment 广播
 	round.temp.signRound4Messages[round.PartyID().Index] = r4msg
 	round.out <- r4msg
 

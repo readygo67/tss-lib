@@ -58,6 +58,7 @@ const (
 	MaxSeedBytes = 64 // 512 bits
 )
 
+// BIP32 的实现
 // Extended public key serialization, defined in BIP32
 func (k *ExtendedKey) String() string {
 	// version(4) || depth(1) || parentFP (4) || childinde(4) || chaincode (32) || key(33) || checksum(4)

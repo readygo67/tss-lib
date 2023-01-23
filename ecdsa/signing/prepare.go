@@ -16,6 +16,8 @@ import (
 )
 
 // PrepareForSigning(), GG18Spec (11) Fig. 14
+// i:本party的id
+// pax: len(ks),参与
 func PrepareForSigning(ec elliptic.Curve, i, pax int, xi *big.Int, ks []*big.Int, bigXs []*crypto.ECPoint) (wi *big.Int, bigWs []*crypto.ECPoint) {
 	modQ := common.ModInt(ec.Params().N)
 	if len(ks) != len(bigXs) {
@@ -29,7 +31,7 @@ func PrepareForSigning(ec elliptic.Curve, i, pax int, xi *big.Int, ks []*big.Int
 	}
 
 	// 2-4.
-	wi = xi
+	wi = xi // additive sharing, 可以通过拉格朗日系数乘以xi得到 wi = [(0 - ks[j])/(ks[i] - ks[j])]
 	for j := 0; j < pax; j++ {
 		if j == i {
 			continue
@@ -44,7 +46,7 @@ func PrepareForSigning(ec elliptic.Curve, i, pax int, xi *big.Int, ks []*big.Int
 		wi = modQ.Mul(wi, coef)
 	}
 
-	// 5-10.
+	// 5-10. 看起来是bigWj= g^aj
 	bigWs = make([]*crypto.ECPoint, len(ks))
 	for j := 0; j < pax; j++ {
 		bigWj := bigXs[j]

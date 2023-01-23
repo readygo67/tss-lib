@@ -31,7 +31,8 @@ func (round *round3) Start() *tss.Error {
 	Ps := round.Parties().IDs()
 	PIdx := round.PartyID().Index
 
-	// 1,9. calculate xi
+	// 1,9. calculate xi， round3 计算出所有参与方都在时候的私钥。
+	// 将其他parties 发过来的shares相加， x_1 = f_a(1) + f_b(1) + f_c(1) + f_d(1)
 	xi := new(big.Int).Set(round.temp.shares[PIdx].Share)
 	for j := range Ps {
 		if j == PIdx {
@@ -41,7 +42,7 @@ func (round *round3) Start() *tss.Error {
 		share := r2msg1.UnmarshalShare()
 		xi = new(big.Int).Add(xi, share)
 	}
-	round.save.Xi = new(big.Int).Mod(xi, round.Params().EC().Params().N)
+	round.save.Xi = new(big.Int).Mod(xi, round.Params().EC().Params().N) // Xi = f_a(i) + f_b(i) + f_c(i) + f_d(i)
 
 	// 2-3.
 	Vc := make(vss.Vs, round.Threshold()+1)
@@ -54,18 +55,20 @@ func (round *round3) Start() *tss.Error {
 		unWrappedErr error
 		pjVs         vss.Vs
 	}
-	chs := make([]chan vssOut, len(Ps))
+	chs := make([]chan vssOut, len(Ps)) // 20个参与方的
 	for i := range chs {
 		if i == PIdx {
 			continue
 		}
 		chs[i] = make(chan vssOut)
 	}
-	for j := range Ps {
+
+	for j := range Ps { // 所有的参与方
 		if j == PIdx {
 			continue
 		}
 		// 6-8.
+		// 所有的参与方，每个参与方验证，验证fieldman_vss 分享方案
 		go func(j int, ch chan<- vssOut) {
 			// 4-9.
 			KGCj := round.temp.KGCs[j]
@@ -122,6 +125,7 @@ func (round *round3) Start() *tss.Error {
 			return round.WrapError(multiErr, culprits...)
 		}
 	}
+
 	{
 		var err error
 		culprits := make([]*tss.PartyID, 0, len(Ps)) // who caused the error(s)
@@ -170,6 +174,7 @@ func (round *round3) Start() *tss.Error {
 	}
 
 	// 17. compute and SAVE the ECDSA public key `y`
+	// 构造出公钥。
 	ecdsaPubKey, err := crypto.NewECPoint(round.Params().EC(), Vc[0].X(), Vc[0].Y())
 	if err != nil {
 		return round.WrapError(errors2.Wrapf(err, "public key is not on the curve"))
@@ -177,7 +182,7 @@ func (round *round3) Start() *tss.Error {
 	round.save.ECDSAPub = ecdsaPubKey
 
 	// PRINT public key & private share
-	common.Logger.Debugf("%s public key: %x", round.PartyID(), ecdsaPubKey)
+	common.Logger.Infof("%s public key: %x", round.PartyID(), ecdsaPubKey)
 
 	// BROADCAST paillier proof for Pi
 	ki := round.PartyID().KeyInt()

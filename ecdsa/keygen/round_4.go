@@ -38,6 +38,7 @@ func (round *round4) Start() *tss.Error {
 		if j == i {
 			continue
 		}
+		// 验证每个pailier proof
 		r3msg := msg.Content().(*KGRound3Message)
 		go func(prf paillier.Proof, j int, ch chan<- bool) {
 			ppk := round.save.PaillierPKs[j]
@@ -73,7 +74,7 @@ func (round *round4) Start() *tss.Error {
 		return round.WrapError(errors.New("paillier verify failed"), culprits...)
 	}
 
-	round.end <- *round.save
+	round.end <- *round.save // 通过所有的检查，将DKG的结果发给round.end channel,
 
 	return nil
 }

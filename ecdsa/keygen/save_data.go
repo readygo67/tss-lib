@@ -36,14 +36,14 @@ type (
 		LocalSecrets
 
 		// original indexes (ki in signing preparation phase)
-		Ks []*big.Int
+		Ks []*big.Int // keyshare
 
 		// n-tilde, h1, h2 for range proofs
 		NTildej, H1j, H2j []*big.Int
 
 		// public keys (Xj = uj*G for each Pj)
 		BigXj       []*crypto.ECPoint     // Xj
-		PaillierPKs []*paillier.PublicKey // pkj
+		PaillierPKs []*paillier.PublicKey // pkj 记录每一个party的paillier publickey
 
 		// used for test assertions (may be discarded)
 		ECDSAPub *crypto.ECPoint // y
