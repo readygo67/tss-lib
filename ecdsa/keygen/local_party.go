@@ -47,11 +47,11 @@ type (
 		localMessageStore
 
 		// temp data (thrown away after keygen)
-		ui            *big.Int // used for tests
-		KGCs          []cmt.HashCommitment
-		vs            vss.Vs
-		shares        vss.Shares
-		deCommitPolyG cmt.HashDeCommitment
+		ui            *big.Int             // used for tests, 部分私钥，正式使用时应该要去掉
+		KGCs          []cmt.HashCommitment // 记录各个party的 隐藏多项式 {C=hash(g^a0, g^a1,....), D=[g^a0, g^a1, ....]}的C
+		vs            vss.Vs               // 本party的[g^a0, g^a1, ....]
+		shares        vss.Shares           // 本party产生的[ids[1], f(ids[1])], [ids[2], f(ids[2])]..
+		deCommitPolyG cmt.HashDeCommitment // 本party 的隐藏多项式  D=[r, g^a0, g^a1, ....]
 	}
 )
 
@@ -65,6 +65,7 @@ func NewLocalParty(
 	partyCount := params.PartyCount()
 	data := NewLocalPartySaveData(partyCount)
 	// when `optionalPreParams` is provided we'll use the pre-computed primes instead of generating them from scratch
+	// 如果提供了预先生成的preParams, 那么preParams的个数只能是一个。
 	if 0 < len(optionalPreParams) {
 		if 1 < len(optionalPreParams) {
 			panic(errors.New("keygen.NewLocalParty expected 0 or 1 item in `optionalPreParams`"))
@@ -82,18 +83,18 @@ func NewLocalParty(
 		out:       out,
 		end:       end,
 	}
-	// msgs init
+	// msgs init，初始化message 存储空间。
 	p.temp.kgRound1Messages = make([]tss.ParsedMessage, partyCount)
 	p.temp.kgRound2Message1s = make([]tss.ParsedMessage, partyCount)
 	p.temp.kgRound2Message2s = make([]tss.ParsedMessage, partyCount)
 	p.temp.kgRound3Messages = make([]tss.ParsedMessage, partyCount)
 	// temp data init
-	p.temp.KGCs = make([]cmt.HashCommitment, partyCount)
+	p.temp.KGCs = make([]cmt.HashCommitment, partyCount) // KGC是什么??
 	return p
 }
 
 func (p *LocalParty) FirstRound() tss.Round {
-	return newRound1(p.params, &p.data, &p.temp, p.out, p.end)
+	return newRound1(p.params, &p.data, &p.temp, p.out, p.end) // 输入params，savdata 空间，tempdata空间，out channels，end channel
 }
 
 func (p *LocalParty) Start() *tss.Error {
@@ -149,7 +150,7 @@ func (p *LocalParty) StoreMessage(msg tss.ParsedMessage) (bool, *tss.Error) {
 	return true, nil
 }
 
-// recovers a party's original index in the set of parties during keygen
+// recovers a party's original index in the set of parties during keygen, 获取
 func (save LocalPartySaveData) OriginalIndex() (int, error) {
 	index := -1
 	ki := save.ShareID

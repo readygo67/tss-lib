@@ -18,31 +18,31 @@ import (
 
 type (
 	LocalPreParams struct {
-		PaillierSK *paillier.PrivateKey // ski
-		NTildei,
-		H1i, H2i,
-		Alpha, Beta,
-		P, Q *big.Int
+		PaillierSK *paillier.PrivateKey //
+		NTildei,   // 两个safePrime p1/p2的乘积
+		H1i, H2i, // H1i随机数 f1的平方, H2i随机数 f1的平方 * 另一个随机数alpha 的乘积
+		Alpha, Beta, // 随机数alpha, beta = 1/alpha
+		P, Q *big.Int // 第一个safePrime的q, 第二个safePrime的q
 	}
 
 	LocalSecrets struct {
 		// secret fields (not shared, but stored locally)
-		Xi, ShareID *big.Int // xi, kj
+		Xi, ShareID *big.Int // xi, kj  //Xi= Sum(f_1(ids[i], f_1(ids[2], ...))) 各个party的隐藏多项式计算得到的share[i] 之和。ShareID是ids[i]
 	}
 
 	// Everything in LocalPartySaveData is saved locally to user's HD when done
 	LocalPartySaveData struct {
-		LocalPreParams
-		LocalSecrets
+		LocalPreParams // party[i] 产生的PreParams
+		LocalSecrets   // party[i] 的Sum(f_1(ids[i], f_1(ids[2], ...))), 和ids[i]
 
 		// original indexes (ki in signing preparation phase)
-		Ks []*big.Int // keyshare
+		Ks []*big.Int // keyshare，//Ks 记录各个party的ids[i]
 
 		// n-tilde, h1, h2 for range proofs
-		NTildej, H1j, H2j []*big.Int
+		NTildej, H1j, H2j []*big.Int // 记录每一个party的n-tilde,h1, h2
 
 		// public keys (Xj = uj*G for each Pj)
-		BigXj       []*crypto.ECPoint     // Xj
+		BigXj       []*crypto.ECPoint     // 记录每一个party的私钥分片u[j]对应的隐藏多项式之和对各个ids[]的结果
 		PaillierPKs []*paillier.PublicKey // pkj 记录每一个party的paillier publickey
 
 		// used for test assertions (may be discarded)
@@ -50,6 +50,7 @@ type (
 	}
 )
 
+// 分配partyCount个Ks,NTildej, H1j, H@=2j, BigXj, PaillierPKs个以存储所有party的数据。
 func NewLocalPartySaveData(partyCount int) (saveData LocalPartySaveData) {
 	saveData.Ks = make([]*big.Int, partyCount)
 	saveData.NTildej = make([]*big.Int, partyCount)

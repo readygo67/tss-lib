@@ -17,8 +17,8 @@ const (
 type (
 	base struct {
 		*tss.Parameters
-		save    *LocalPartySaveData
-		temp    *localTempData
+		save    *LocalPartySaveData // 保存本party的paillier，ecdsa私钥信息, 以及其他party的公开信息
+		temp    *localTempData      // 保存localMessageStore 和其他的一些temp的信息。
 		out     chan<- tss.Message
 		end     chan<- LocalPartySaveData
 		ok      []bool // `ok` tracks parties which have been verified by Update()

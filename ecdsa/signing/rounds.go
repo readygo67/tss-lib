@@ -16,6 +16,7 @@ const (
 	TaskName = "signing"
 )
 
+// rounds 定义了各个round能共用的函数，Params/RoundNumber/CanProceed
 type (
 	base struct {
 		*tss.Parameters

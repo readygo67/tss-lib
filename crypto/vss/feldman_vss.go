@@ -73,7 +73,7 @@ func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.In
 		return nil, nil, errors.New("vss threshold < 1")
 	}
 
-	ids, err := CheckIndexes(ec, indexes) //
+	ids, err := CheckIndexes(ec, indexes) // 部分私钥分片的多项式，自变量indexs 中不能有相同的index，不能有为0的index
 	if err != nil {
 		return nil, nil, err
 	}
@@ -95,13 +95,13 @@ func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.In
 	shares := make(Shares, num)
 	for i := 0; i < num; i++ {
 		share := evaluatePolynomial(ec, threshold, poly, ids[i])           // yi = a0+ a1 * xi + a2 *xi^2 +...,
-		shares[i] = &Share{Threshold: threshold, ID: ids[i], Share: share} // ids[i] 为多项式中的xi，share 为多项式中的yi
+		shares[i] = &Share{Threshold: threshold, ID: ids[i], Share: share} // ids[i] 为多项式中的xi，share 为多项式中的yi,得到party[i]部分私钥u[i]的多项式隐藏shares
 	}
-	return v, shares, nil
+	return v, shares, nil // v的数量是threshold+1, shares的数量是所有的parties。
 }
 
 // 每一个share验证自己share的有效性，
-// vs[i] = c[i] //commitment， c[i] = g^ai
+// vs[i] = c[i] //commitment， c[i] = g^ai，vs= 隐藏多项式[g^a0, g^a1, .....],share = (ids[i], f)
 func (share *Share) Verify(ec elliptic.Curve, threshold int, vs Vs) bool {
 	if share.Threshold != threshold || vs == nil {
 		return false
@@ -121,7 +121,7 @@ func (share *Share) Verify(ec elliptic.Curve, threshold int, vs Vs) bool {
 		}
 	}
 
-	sigmaGi := crypto.ScalarBaseMult(ec, share.Share)
+	sigmaGi := crypto.ScalarBaseMult(ec, share.Share) // g^f(x) = g^(a0+a1*x + a2*x^2 + a3*x^3+....)
 	return sigmaGi.Equals(v)
 }
 
@@ -160,7 +160,7 @@ func (shares Shares) ReConstruct(ec elliptic.Curve) (secret *big.Int, err error)
 	return secret, nil
 }
 
-// 随机产生多项式y = a0+a1*x +a2 *x^2 + a3 *x^3 + ... 中的系数， a0 = secret, a1 = xxx
+// 随机产生多项式y = a0+a1*x +a2 *x^2 + a3 *x^3 + ... 中的系数， a0 = secret, a1 = 随机产生的系数
 func samplePolynomial(ec elliptic.Curve, threshold int, secret *big.Int) []*big.Int {
 	// q := ec.Params().N
 	v := make([]*big.Int, threshold+1)
@@ -174,6 +174,7 @@ func samplePolynomial(ec elliptic.Curve, threshold int, secret *big.Int) []*big.
 
 // Evauluates a polynomial with coefficients such that:
 // evaluatePolynomial([a, b, c, d], x):
+// v[]
 //
 //	returns a + bx + cx^2 + dx^3, //y=a0 +(a1 * x) + (a2 * x^2) + (a3 * x^3) + (a4 * x^4), 其中
 func evaluatePolynomial(ec elliptic.Curve, threshold int, v []*big.Int, id *big.Int) (result *big.Int) {

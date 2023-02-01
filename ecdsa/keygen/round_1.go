@@ -23,6 +23,16 @@ var (
 )
 
 // round 1 represents round 1 of the keygen part of the GG18 ECDSA TSS spec (Gennaro, Goldfeder; 2018)
+// round1: 广播party[i]产生的paillier 公钥，+ 隐藏多项式的hash[g^a0, g^a1,....], +safePrime的NTildei,H1i,H2i，以及他们的dlnProof。
+// round2: party[i]将为party[j]产生的share[j] p2p发送给party[j], 广播party[i]的隐藏多项式[r, g^a0, g^a1, g^a2,....]
+// round3: party[i]
+// 1. 将在r1msg1中收到的party[j]的hash[g^a0, g^a1,....] 和r2msg2 收到的party[j]隐藏多项式[r, g^a0, g^a1, g^a2,....] 生成HashCommitDecommit，并验证
+// 2. 将party[j] 通过 r2msg1中发来的share[i]，和party[j]通过r2msg2中发过来的生成多项式[g^a0, g^a1, g^a2,....] 验证。
+// 3. 将各个party[j] 发过来的share[i]相加，得到save.Xi
+// 4. 计算bigXj 为各参与方隐藏多项式之和，在对应ids[j]的取值。各个party的bigXj相同
+// 4. 计算得到公钥
+// 5. 产生(ids[i], ecdsaPubkey)的paillier证明
+// round4: 验证(ids[i], ecdsaPubkey)的paillier是否正确，如果正确将round
 func newRound1(params *tss.Parameters, save *LocalPartySaveData, temp *localTempData, out chan<- tss.Message, end chan<- LocalPartySaveData) tss.Round {
 	return &round1{
 		&base{params, save, temp, out, end, make([]bool, len(params.Parties().IDs())), false, 1}}
@@ -43,13 +53,13 @@ func (round *round1) Start() *tss.Error {
 	// 随机产生部分私钥
 	ui := common.GetRandomPositiveInt(round.Params().EC().Params().N)
 
-	round.temp.ui = ui
+	round.temp.ui = ui // 产生部分私钥
 
 	// 2. compute the vss shares
 	// f(x) = a0 + a1*x + a2*x^2 + ....
 	// vs[0] = g^a0, vs[1] = g^a1, vs[i] = g^ai, 2个 commitment
 	// shares = {xi, f(xi)}
-	// 把ui 通过一个多项式fa(x), 得到share fa(ids[0]), fa(ids[1]), fa(ids[2])
+	// 把party[i] 的部分私钥u[i] 通过一个多项式fa(x), 得到shares， shares = [(ids[0] f_a(ids[0])), (ids[1],fa(ids[1])), (ids[2],fa(ids[2]))]
 	ids := round.Parties().IDs().Keys()
 	vs, shares, err := vss.Create(round.Params().EC(), round.Threshold(), ui, ids)
 	if err != nil {
@@ -62,14 +72,14 @@ func (round *round1) Start() *tss.Error {
 	_ = ui    // silences a linter warning
 
 	// make commitment -> (C, D)
-	// 将vs[0] = g ^a0, vs[1] = g^a1, 变成 变成[]*big.Int数组
-	pGFlat, err := crypto.FlattenECPoints(vs)
+	// 将vs[0] = g ^a0, vs[1] = g^a1, 变成[]*big.Int数组，pGFlat = [vs[0], vs[1], vs[2].....]
+	pGFlat, err := crypto.FlattenECPoints(vs) // 将party[i]的部分私钥u[i]的隐藏多项式g^a[0], g^[a1] flat
 	if err != nil {
 		return round.WrapError(err, Pi)
 	}
 
 	// 将vs[0] = g ^a0, vs[1] = g^a1, 变成 变成[]*big.Int数组 再做一个commitment.
-	// pGFlat = [r, vs[0], vs[1], vs[2].....]
+	// pGFlat = [r, vs[0], vs[1], vs[2].....] cmt.C = hash(r, vs[0], vs[1], ...), cmt.D = [r, vs[0], vs[1], ...]
 	cmt := cmts.NewHashCommitment(pGFlat...)
 
 	// 4. generate Paillier public key E_i, private key and proof
@@ -109,14 +119,14 @@ func (round *round1) Start() *tss.Error {
 	// and keep in temporary storage:
 	// - VSS Vs
 	// - our set of Shamir shares
-	round.save.ShareID = ids[i]
-	round.temp.vs = vs
-	round.temp.shares = shares // [](xi, f(xi))
+	round.save.ShareID = ids[i] // shareID，记录本party的ids
+	round.temp.vs = vs          // 记录本party[i] 隐藏多项式系数的[g^a0, g^a1, g^a2,....]
+	round.temp.shares = shares  // 记录party[i]产生的u[i]的隐藏多项式的[ids[1], f(ids[1])], [ids[2], f(ids[2])],[ids[3], f(ids[3])]
 
 	// for this P: SAVE de-commitments, paillier keys for round 2
 	round.save.PaillierSK = preParams.PaillierSK
 	round.save.PaillierPKs[i] = &preParams.PaillierSK.PublicKey
-	round.temp.deCommitPolyG = cmt.D
+	round.temp.deCommitPolyG = cmt.D // 记录本party[i] 隐藏多项式系数的[r,g^a0, g^a1, g^a2,....]
 
 	// BROADCAST commitments, paillier pk + proof; round 1 message
 	{

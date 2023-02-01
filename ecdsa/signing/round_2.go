@@ -47,7 +47,7 @@ func (round *round2) Start() *tss.Error {
 				round.Parameters.EC(),
 				round.key.PaillierPKs[j],
 				rangeProofAliceJ,
-				round.temp.gamma, // 将其他party传过来的kj 和 本地的gammai 传入，
+				round.temp.gamma, // 将其他party传过来的kj 和 本地的gamma 传入，
 				r1msg.UnmarshalC(),
 				round.key.NTildej[j],
 				round.key.H1j[j],
@@ -56,7 +56,7 @@ func (round *round2) Start() *tss.Error {
 				round.key.H1j[i],
 				round.key.H2j[i])
 			// should be thread safe as these are pre-allocated
-			round.temp.betas[j] = beta   // 记录传给betaj
+			round.temp.betas[j] = beta   // 记录传给party[j]的beta
 			round.temp.c1jis[j] = c1ji   // cipher(k*gamma-beta)
 			round.temp.pi1jis[j] = pi1ji // proof(cipher(k*gamma-beta))
 			if err != nil {

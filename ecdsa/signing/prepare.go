@@ -47,20 +47,20 @@ func PrepareForSigning(ec elliptic.Curve, i, pax int, xi *big.Int, ks []*big.Int
 	}
 
 	// 5-10. 看起来是bigWj= g^aj
-	bigWs = make([]*crypto.ECPoint, len(ks))
-	for j := 0; j < pax; j++ {
-		bigWj := bigXs[j]
+	bigWs = make([]*crypto.ECPoint, len(ks)) // len(ks)= threshold +1
+	for j := 0; j < pax; j++ {               // pax = threshold +1
+		bigWj := bigXs[j] // bigXj = Vc[0] + Vc[1]*(ids[j]) + vc[2]*(ids[j])^2
 		for c := 0; c < pax; c++ {
 			if j == c {
 				continue
 			}
 			ksc := ks[c]
 			ksj := ks[j]
-			if ksj.Cmp(ksc) == 0 {
+			if ksj.Cmp(ksc) == 0 { // 如果参与签名的两个party， party[c] 的ids[c] 和party[j]的ids[j]相同，则报错。
 				panic(fmt.Errorf("index of two parties are equal"))
 			}
-			// big.Int Div is calculated as: a/b = a * modInv(b,q)
-			iota := modQ.Mul(ksc, modQ.ModInverse(new(big.Int).Sub(ksc, ksj)))
+			// big.Int Div is calculated as: a/b = a * modInv(b,q)   ids[c]/(ids[c] - ids[j]), 具体的作用不明确
+			iota := modQ.Mul(ksc, modQ.ModInverse(new(big.Int).Sub(ksc, ksj))) // bigWj = bigXj * ids[k]/(ids[k] - ids[j]) * ids[c]/(ids[c] - ids[j])
 			bigWj = bigWj.ScalarMult(iota)
 		}
 		bigWs[j] = bigWj

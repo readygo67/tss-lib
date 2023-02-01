@@ -76,13 +76,13 @@ func (round *round2) Start() *tss.Error {
 
 		dlnVerifier.VerifyDLNProof1(r1msg, H1j, H2j, NTildej, func(isValid bool) {
 			if !isValid {
-				dlnProof1FailCulprits[_j] = _msg.GetFrom()
+				dlnProof1FailCulprits[_j] = _msg.GetFrom() // 如果无效，记录作恶的那个party
 			}
 			wg.Done()
 		})
 		dlnVerifier.VerifyDLNProof2(r1msg, H2j, H1j, NTildej, func(isValid bool) {
 			if !isValid {
-				dlnProof2FailCulprits[_j] = _msg.GetFrom()
+				dlnProof2FailCulprits[_j] = _msg.GetFrom() // /如果无效，记录作恶的那个party
 			}
 			wg.Done()
 		})
@@ -93,7 +93,7 @@ func (round *round2) Start() *tss.Error {
 			return round.WrapError(errors.New("dln proof verification failed"), culprit)
 		}
 	}
-	// save NTilde_j, h1_j, h2_j, ..., 在round1中收到其他parties过来的消息，验证过后
+	// save NTilde_j, h1_j, h2_j, ..., 在round1中收到其他parties过来的消息，验证过后将其保存在
 	for j, msg := range round.temp.kgRound1Messages {
 		if j == i {
 			continue
@@ -111,20 +111,20 @@ func (round *round2) Start() *tss.Error {
 		round.temp.KGCs[j] = KGC
 	}
 
-	// 5. p2p send share ui 的share[j] to Pj， 将本地ui 的share[(ids[i], f(ids))]发给peer
+	// 5. p2p send share ui 的share[j] to Pj， 将本地ui 的share[(ids[j], f_i(ids[j]))]发给peer
 	shares := round.temp.shares
 	for j, Pj := range round.Parties().IDs() {
 		r2msg1 := NewKGRound2Message1(Pj, round.PartyID(), shares[j])
 		// do not send to this Pj, but store for round 3
 		if j == i {
-			round.temp.kgRound2Message1s[j] = r2msg1
+			round.temp.kgRound2Message1s[j] = r2msg1 // 将本party的r2msg1保存起来。
 			continue
 		}
 		round.out <- r2msg1
 	}
 
 	// 7. BROADCAST de-commitments of Shamir poly*G,
-	// deCommitPolyG 是vs[0] =[r, g^a0, g^a1, g^a2] 的多项式
+	// 广播本party 隐藏多项式[r, g^a0,g^a1,g^a2,...]的commitment。
 	r2msg2 := NewKGRound2Message2(round.PartyID(), round.temp.deCommitPolyG)
 	round.temp.kgRound2Message2s[i] = r2msg2
 	round.out <- r2msg2

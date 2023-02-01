@@ -117,7 +117,7 @@ func BaseStart(p Party, task string, prepare ...func(Round) *Error) *Error {
 	if p.PartyID() == nil || !p.PartyID().ValidateBasic() {
 		return p.WrapError(fmt.Errorf("could not start. this party has an invalid PartyID: %+v", p.PartyID()))
 	}
-	if p.round() != nil {
+	if p.round() != nil { // 没有已经存在的round,
 		return p.WrapError(errors.New("could not start. this party is in an unexpected state. use the constructor and Start()"))
 	}
 	round := p.FirstRound()
@@ -127,7 +127,7 @@ func BaseStart(p Party, task string, prepare ...func(Round) *Error) *Error {
 	if 1 < len(prepare) {
 		return p.WrapError(errors.New("too many prepare functions given to Start(); 1 allowed"))
 	}
-	if len(prepare) == 1 {
+	if len(prepare) == 1 { // 最多只有一个prepare.
 		if err := prepare[0](round); err != nil {
 			return err
 		}
@@ -163,6 +163,7 @@ func BaseUpdate(p Party, msg ParsedMessage, task string) (ok bool, err *Error) {
 		if _, err := p.round().Update(); err != nil {
 			return r(false, err)
 		}
+		// TODO(keep),感觉此处有优化的空间，在signRound1Msg 的 p.round().Update()处理中，第一个返回值为true时就能canProceed
 		// 收到了所有parties的消息，进行下来，advance中使用round1, round2,....来表示不同的round
 		if p.round().CanProceed() {
 			if p.advance(); p.round() != nil {

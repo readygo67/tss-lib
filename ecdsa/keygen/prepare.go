@@ -55,8 +55,8 @@ func GeneratePreParamsWithContext(ctx context.Context, optionalConcurrency ...in
 	}
 
 	// prepare for concurrent Paillier and safe prime generation
-	paiCh := make(chan *paillier.PrivateKey, 1)
-	sgpCh := make(chan []*common.GermainSafePrime, 1)
+	paiCh := make(chan *paillier.PrivateKey, 1)       // 产生paillier 私钥
+	sgpCh := make(chan []*common.GermainSafePrime, 1) // 产生GermainSafePrime
 
 	// 4. generate Paillier public key E_i, private key and proof
 	go func(ch chan<- *paillier.PrivateKey) {
@@ -118,27 +118,27 @@ consumer:
 	}
 	logProgressTicker.Stop()
 
-	P, Q := sgps[0].SafePrime(), sgps[1].SafePrime()
-	NTildei := new(big.Int).Mul(P, Q) // (2p + 1) * (2q + 1)
+	P, Q := sgps[0].SafePrime(), sgps[1].SafePrime() // 产生两对safePrime, 取P1，P2 的名字更加符合  p1= 2q1+1, p2=2q2+1
+	NTildei := new(big.Int).Mul(P, Q)                // p1 * p2
 	modNTildeI := common.ModInt(NTildei)
 
-	p, q := sgps[0].Prime(), sgps[1].Prime()
-	modPQ := common.ModInt(new(big.Int).Mul(p, q)) // p * 1
-	f1 := common.GetRandomPositiveRelativelyPrimeInt(NTildei)
+	p, q := sgps[0].Prime(), sgps[1].Prime()                  // 产生两对safePrime, 取q1，q2 的名字更加符合
+	modPQ := common.ModInt(new(big.Int).Mul(p, q))            // q1 * q2
+	f1 := common.GetRandomPositiveRelativelyPrimeInt(NTildei) // f1 和 alpha 为一个和NTildei 的最大公约是1的数。
 	alpha := common.GetRandomPositiveRelativelyPrimeInt(NTildei)
 	beta := modPQ.ModInverse(alpha)   // beta = 1/alaph
 	h1i := modNTildeI.Mul(f1, f1)     // h1 = f1^2
 	h2i := modNTildeI.Exp(h1i, alpha) // h2 = h1 ^ alpha
 
 	preParams := &LocalPreParams{
-		PaillierSK: paiSK,
-		NTildei:    NTildei,
-		H1i:        h1i,
-		H2i:        h2i,
-		Alpha:      alpha,
-		Beta:       beta,
-		P:          p,
-		Q:          q,
+		PaillierSK: paiSK,   // paillier 的私钥
+		NTildei:    NTildei, // 两个safePrime p1/p2的乘积
+		H1i:        h1i,     // 随机数 f1的平方
+		H2i:        h2i,     // 随机数 f1的平方 * 另一个随机数alpha 的乘积
+		Alpha:      alpha,   // 随机数alpha
+		Beta:       beta,    // 随机数 alpha的倒数
+		P:          p,       // 第一个safePrime的q
+		Q:          q,       // 第二个safePrime的q
 	}
 	return preParams, nil
 }

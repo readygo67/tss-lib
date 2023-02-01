@@ -56,7 +56,7 @@ func TestE2EConcurrent(t *testing.T) {
 
 	updater := test.SharedPartyUpdater
 
-	// init the parties
+	// 使用随机挑选的11个parties 构建localParty， init the parties,
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(tss.S256(), p2pCtx, signPIDs[i], len(signPIDs), threshold)
 
@@ -70,7 +70,7 @@ func TestE2EConcurrent(t *testing.T) {
 	}
 
 	var ended int32
-signing:
+signing: // signning 模拟通信信道，实际使用的时候是p2p routine
 	for {
 		fmt.Printf("ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
 		select {
@@ -79,9 +79,9 @@ signing:
 			assert.FailNow(t, err.Error())
 			break signing
 
-		case msg := <-outCh:
+		case msg := <-outCh: // 从outCh处收到msg。
 			dest := msg.GetTo()
-			if dest == nil {
+			if dest == nil { // dest == nil 为广播消息
 				for _, P := range parties {
 					if P.PartyID().Index == msg.GetFrom().Index {
 						continue

@@ -51,7 +51,7 @@ func NewDLNProof(h1, h2, x, p, q, N *big.Int) *Proof {
 		cIBI = cIBI.SetInt64(int64(cI))
 		t[i] = modPQ.Add(a[i], modPQ.Mul(cIBI, x)) // t[i]= a[i] + 0/1 * x
 	}
-	return &Proof{alpha, t} // alpha[i] = g^ai 作为， t[i]也包含a[i], x 的信息
+	return &Proof{alpha, t} // alpha[i] = h1^ai 作为， t[i]也包含a[i], x 的信息
 }
 
 func (p *Proof) Verify(h1, h2, N *big.Int) bool {

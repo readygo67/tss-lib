@@ -63,10 +63,10 @@ func (round *round1) Start() *tss.Error {
 	round.temp.k = k
 	round.temp.gamma = gamma
 	round.temp.pointGamma = pointGamma
-	round.temp.deCommit = cmt.D
+	round.temp.deCommit = cmt.D // pointGamma的commit.D
 
 	i := round.PartyID().Index
-	round.ok[i] = true
+	round.ok[i] = true // 本party[i], 这一轮的ok 记为true
 
 	for j, Pj := range round.Parties().IDs() { // partyi 给partyj 发送 mta
 		if j == i {
@@ -90,10 +90,10 @@ func (round *round1) Start() *tss.Error {
 
 func (round *round1) Update() (bool, *tss.Error) {
 	for j, msg1 := range round.temp.signRound1Message1s {
-		if round.ok[j] {
+		if round.ok[j] { // 对party[j]发送的消息已经登记过了，continue
 			continue
 		}
-		if msg1 == nil || !round.CanAccept(msg1) {
+		if msg1 == nil || !round.CanAccept(msg1) { // 在所有的待接收的11个消息中， 如果接收到5，但是没有接收到2，在2的时候就会return false。
 			return false, nil
 		}
 		msg2 := round.temp.signRound1Message2s[j]
@@ -127,9 +127,9 @@ func (round *round1) NextRound() tss.Round {
 func (round *round1) prepare() error {
 	i := round.PartyID().Index
 
-	xi := round.key.Xi
-	ks := round.key.Ks
-	bigXs := round.key.BigXj
+	xi := round.key.Xi       // threshold+1个参与方，Xi
+	ks := round.key.Ks       // 记录每个party的ids
+	bigXs := round.key.BigXj // bigXj = Vc[0] + Vc[1]*(ids[j]) + vc[2]*(ids[j])^2
 
 	if round.temp.keyDerivationDelta != nil {
 		// adding the key derivation delta to the xi's

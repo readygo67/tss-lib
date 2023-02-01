@@ -41,7 +41,7 @@ func BobMid(
 	}
 	q := ec.Params().N
 	betaPrm = common.GetRandomPositiveInt(pkA.N)
-	cBetaPrm, cRand, err := pkA.EncryptAndReturnRandomness(betaPrm) // cBeta 为加密后的beta
+	cBetaPrm, cRand, err := pkA.EncryptAndReturnRandomness(betaPrm) // cBeta 为加密后的betaPrm, beta为随机选择的
 	if err != nil {
 		return
 	}

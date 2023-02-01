@@ -111,6 +111,7 @@ func NewMessage(meta MessageRouting, content MessageContent, wire *MessageWrappe
 	}
 }
 
+// MessageImpl 对各轮的msg都包了一层，并实现了message interface 接口
 func (mm *MessageImpl) Type() string {
 	return string(proto.MessageName(mm.content))
 }

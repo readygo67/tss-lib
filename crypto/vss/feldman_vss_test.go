@@ -198,3 +198,29 @@ func TestReconstruct2(t *testing.T) {
 	assert.NotZero(t, secret5)
 	fmt.Printf("secret5:%v\n", secret5.String())
 }
+
+func TestVerify2(t *testing.T) {
+	num, threshold := 4, 2
+
+	secret := big.NewInt(100)
+	secretStr := secret.String()
+	fmt.Printf("secret:%v\n", secretStr)
+
+	ids := make([]*big.Int, 0)
+	idsStr := make([]string, 0)
+	for i := 0; i < num; i++ {
+		r := big.NewInt(int64(i + 1))
+		ids = append(ids, r)
+		idsStr = append(idsStr, r.String())
+	}
+	fmt.Printf("idsStr:%v\n", idsStr)
+
+	vs, shares, err := Create(tss.EC(), threshold, secret, ids)
+
+	assert.NoError(t, err)
+
+	assert.True(t, shares[0].Verify(tss.EC(), threshold, vs)) // 每一个碎片验证是否
+	assert.True(t, shares[1].Verify(tss.EC(), threshold, vs))
+	assert.True(t, shares[2].Verify(tss.EC(), threshold, vs))
+	assert.True(t, shares[3].Verify(tss.EC(), threshold, vs))
+}

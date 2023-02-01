@@ -28,7 +28,7 @@ type (
 		Ks []*big.Int
 
 		// public keys (Xj = uj*G for each Pj)
-		BigXj []*crypto.ECPoint // Xj
+		BigXj []*crypto.ECPoint // Xj，
 
 		// used for test assertions (may be discarded)
 		EDDSAPub *crypto.ECPoint // y

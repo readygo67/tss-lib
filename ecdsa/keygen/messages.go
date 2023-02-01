@@ -117,7 +117,7 @@ func NewKGRound2Message1(
 		IsBroadcast: false,
 	}
 	content := &KGRound2Message1{
-		Share: share.Share.Bytes(),
+		Share: share.Share.Bytes(), // 只copy share的值
 	}
 	msg := tss.NewMessageWrapper(meta, content)
 	return tss.NewMessage(meta, content, msg)

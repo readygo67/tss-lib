@@ -38,7 +38,7 @@ func (round *round4) Start() *tss.Error {
 		if j == i {
 			continue
 		}
-		// 验证每个pailier proof
+		// 验证每个(ids[i], ecdsaPub)的pailier proof。
 		r3msg := msg.Content().(*KGRound3Message)
 		go func(prf paillier.Proof, j int, ch chan<- bool) {
 			ppk := round.save.PaillierPKs[j]
@@ -58,7 +58,7 @@ func (round *round4) Start() *tss.Error {
 			round.ok[j] = true
 			continue
 		}
-		round.ok[j] = <-ch
+		round.ok[j] = <-ch // 记录每个
 	}
 	culprits := make([]*tss.PartyID, 0, len(Ps)) // who caused the error(s)
 	for j, ok := range round.ok {
