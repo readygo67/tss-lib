@@ -60,7 +60,7 @@ func CheckIndexes(ec elliptic.Curve, indexes []*big.Int) ([]*big.Int, error) {
 
 // Returns a new array of secret shares created by Shamir's Secret Sharing Algorithm,
 // requiring a minimum number of shares to recreate, of length shares, from the input secret
-// indexes， 总共n个shares
+// indexes，indexs 的长度= 参与keygen的chagn 总共n个shares,
 // threshold， t个分片就能恢复出私钥。
 // Vs[i]=C[i]= g^ai, 为ai的多项式承诺，
 // shares[i] = (xi, yi)，为每个参与方掌握的私钥分片。
@@ -73,7 +73,7 @@ func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.In
 		return nil, nil, errors.New("vss threshold < 1")
 	}
 
-	ids, err := CheckIndexes(ec, indexes) // 部分私钥分片的多项式，自变量indexs 中不能有相同的index，不能有为0的index
+	ids, err := CheckIndexes(ec, indexes) // 部分私钥分片的多项式，自变量indexs 中不能有相同的index，不能有为0的index, index是P2p
 	if err != nil {
 		return nil, nil, err
 	}
@@ -83,13 +83,13 @@ func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.In
 		return nil, nil, ErrNumSharesBelowThreshold
 	}
 
-	poly := samplePolynomial(ec, threshold, secret) // threshold = 3,
+	poly := samplePolynomial(ec, threshold, secret) // threshold = 3, 随机产生多项式的系数。
 	poly[0] = secret                                // becomes sigma*G in v
 	v := make(Vs, len(poly))
 	fmt.Printf("poly:%v\n", poly)
 
 	for i, ai := range poly {
-		v[i] = crypto.ScalarBaseMult(ec, ai) // c0 = g^a0, c1=g^a1, ....
+		v[i] = crypto.ScalarBaseMult(ec, ai) // c0 = g^a0, c1=g^a1, ...., ai是随机产生的多项式个项的系数，其中a0 = poly[0] = 自己掌握的部分私钥。
 	}
 
 	shares := make(Shares, num)
@@ -163,9 +163,9 @@ func (shares Shares) ReConstruct(ec elliptic.Curve) (secret *big.Int, err error)
 // 随机产生多项式y = a0+a1*x +a2 *x^2 + a3 *x^3 + ... 中的系数， a0 = secret, a1 = 随机产生的系数
 func samplePolynomial(ec elliptic.Curve, threshold int, secret *big.Int) []*big.Int {
 	// q := ec.Params().N
-	v := make([]*big.Int, threshold+1)
+	v := make([]*big.Int, threshold+1) //多项式的长度= threshold+1，比如3/5 签名中，如果要求3个人就能恢复出私钥，要求产生一个2次多项式。3个二次多项是就能恢复出私钥。
 	v[0] = secret
-	for i := 1; i <= threshold; i++ {
+	for i := 1; i <= threshold; i++ { //
 		ai := common.GetRandomPositiveInt(ec.Params().N)
 		v[i] = ai
 	}
@@ -184,7 +184,7 @@ func evaluatePolynomial(ec elliptic.Curve, threshold int, v []*big.Int, id *big.
 	X := big.NewInt(int64(1))
 	for i := 1; i <= threshold; i++ { // 逐项累加
 		ai := v[i]
-		X = modQ.Mul(X, id) // x = x^i
+		X = modQ.Mul(X, id) // x = x^i  //即id^i 次方
 		aiXi := new(big.Int).Mul(ai, X)
 		result = modQ.Add(result, aiXi)
 	}

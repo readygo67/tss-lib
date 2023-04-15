@@ -50,7 +50,7 @@ func (round *round1) Start() *tss.Error {
 	i := Pi.Index
 
 	// 1. calculate "partial" key share ui
-	// 随机产生部分私钥
+	// 随机产生部分私钥,ui
 	ui := common.GetRandomPositiveInt(round.Params().EC().Params().N)
 
 	round.temp.ui = ui // 产生部分私钥
@@ -60,7 +60,7 @@ func (round *round1) Start() *tss.Error {
 	// vs[0] = g^a0, vs[1] = g^a1, vs[i] = g^ai, 2个 commitment
 	// shares = {xi, f(xi)}
 	// 把party[i] 的部分私钥u[i] 通过一个多项式fa(x), 得到shares， shares = [(ids[0] f_a(ids[0])), (ids[1],fa(ids[1])), (ids[2],fa(ids[2]))]
-	ids := round.Parties().IDs().Keys()
+	ids := round.Parties().IDs().Keys() //获取每个party的id
 	vs, shares, err := vss.Create(round.Params().EC(), round.Threshold(), ui, ids)
 	if err != nil {
 		return round.WrapError(err, Pi)

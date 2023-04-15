@@ -134,7 +134,7 @@ consumer:
 		PaillierSK: paiSK,   // paillier 的私钥
 		NTildei:    NTildei, // 两个safePrime p1/p2的乘积
 		H1i:        h1i,     // 随机数 f1的平方
-		H2i:        h2i,     // 随机数 f1的平方 * 另一个随机数alpha 的乘积
+		H2i:        h2i,     // 随机数 f1的平方 * 另一个随机数alpha 的幂
 		Alpha:      alpha,   // 随机数alpha
 		Beta:       beta,    // 随机数 alpha的倒数
 		P:          p,       // 第一个safePrime的q

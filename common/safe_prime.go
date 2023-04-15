@@ -25,7 +25,7 @@ const (
 type (
 	GermainSafePrime struct {
 		q,
-		p *big.Int // p = 2q + 1,
+		p *big.Int // p = 2q + 1, //safePrime的定义是一个 质数
 	}
 )
 

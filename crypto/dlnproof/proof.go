@@ -33,6 +33,31 @@ var (
 )
 
 // 产生关于 h1,h2 的一个proof。
+/*
+   dlnproof.NewDLNProof(h1i, h2i, alpha, p, q, NTildei)
+	preParams := &LocalPreParams{
+		PaillierSK: paiSK,   // paillier 的私钥
+		NTildei:    NTildei, // 两个safePrime p1/p2的乘积
+		H1i:        h1i,     // 随机数 f1的平方
+		H2i:        h2i,     // 随机数 f1的平方 * 另一个随机数alpha 的幂
+		Alpha:      alpha,   // 随机数alpha
+		Beta:       beta,    // 随机数 alpha的倒数
+		P:          p,       // 第一个safePrime的q
+		Q:          q,       // 第二个safePrime的q
+	}
+
+h1i, h2i, alpha, beta, p, q, NTildei :=
+		preParams.H1i,
+		preParams.H2i,
+		preParams.Alpha,
+		preParams.Beta,
+		preParams.P,
+		preParams.Q,
+		preParams.NTildei
+	dlnProof1 := dlnproof.NewDLNProof(h1i, h2i, alpha, p, q, NTildei)
+*/
+
+// 输入参数为 h1=h1i, h2= h2i, x= alpha, p=第一个safePrime，q= 第二个safePrime， N= 两个safePrime p1/p2的乘积
 func NewDLNProof(h1, h2, x, p, q, N *big.Int) *Proof {
 	pMulQ := new(big.Int).Mul(p, q)
 	modN, modPQ := common.ModInt(N), common.ModInt(pMulQ)
