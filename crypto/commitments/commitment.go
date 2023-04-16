@@ -23,13 +23,14 @@ type (
 	HashCommitment   = *big.Int
 	HashDeCommitment = []*big.Int
 
+	// keep，C = hash(D)
 	HashCommitDecommit struct {
 		C HashCommitment
 		D HashDeCommitment
 	}
 )
 
-// 构建一个commitment。
+// 构建一个commitment, 在构造commitment时增加一个随机数，这样就可以验证时避免交互。
 func NewHashCommitmentWithRandomness(r *big.Int, secrets ...*big.Int) *HashCommitDecommit {
 	parts := make([]*big.Int, len(secrets)+1)
 	parts[0] = r

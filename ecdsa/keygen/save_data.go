@@ -36,7 +36,7 @@ type (
 		LocalSecrets   // party[i] 的Sum(f_1(ids[i], f_1(ids[2], ...))), 和ids[i]
 
 		// original indexes (ki in signing preparation phase)
-		Ks []*big.Int // keyshare，//Ks 记录各个party的ids[i]
+		Ks []*big.Int // Keys，//Keys 记录各个party的key
 
 		// n-tilde, h1, h2 for range proofs
 		NTildej, H1j, H2j []*big.Int // 记录每一个party的n-tilde,h1, h2

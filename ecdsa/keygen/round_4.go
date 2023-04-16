@@ -25,7 +25,7 @@ func (round *round4) Start() *tss.Error {
 	i := round.PartyID().Index
 	Ps := round.Parties().IDs()
 	PIDs := Ps.Keys()
-	ecdsaPub := round.save.ECDSAPub
+	ecdsaPub := round.save.ECDSAPub // 使用本地产生的ecdsaPub 作为verify的输入，要求
 
 	// 1-3. (concurrent)
 	// r3 messages are assumed to be available and != nil in this function

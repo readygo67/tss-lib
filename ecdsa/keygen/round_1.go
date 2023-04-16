@@ -31,8 +31,8 @@ var (
 // 3. 将各个party[j] 发过来的share[i]相加，得到save.Xi
 // 4. 计算bigXj 为各参与方隐藏多项式之和，在对应ids[j]的取值。各个party的bigXj相同
 // 4. 计算得到公钥
-// 5. 产生(ids[i], ecdsaPubkey)的paillier证明
-// round4: 验证(ids[i], ecdsaPubkey)的paillier是否正确，如果正确将round
+// 5. 产生(ids[i], ecdsaPubkey)的paillier证明，并广播出去
+// round4: 验证每个party 产生的 (ids[i], ecdsaPubkey) paillier证明是否正确，如果正确将结束DKG的过程。
 func newRound1(params *tss.Parameters, save *LocalPartySaveData, temp *localTempData, out chan<- tss.Message, end chan<- LocalPartySaveData) tss.Round {
 	return &round1{
 		&base{params, save, temp, out, end, make([]bool, len(params.Parties().IDs())), false, 1}}
@@ -56,8 +56,9 @@ func (round *round1) Start() *tss.Error {
 	round.temp.ui = ui // 产生部分私钥
 
 	// 2. compute the vss shares
-	// f(x) = a0 + a1*x + a2*x^2 + ....
+	// f(x) = a0 + a1*x + a2*x^2 + .... ，随机产生隐藏多项式
 	// vs[0] = g^a0, vs[1] = g^a1, vs[i] = g^ai, 2个 commitment
+	// vs = [g^a0, g^a1, g^a2, ...]
 	// shares = {xi, f(xi)}
 	// 把party[i] 的部分私钥u[i] 通过一个多项式fa(x), 得到shares， shares = [(ids[0] f_a(ids[0])), (ids[1],fa(ids[1])), (ids[2],fa(ids[2]))]
 	ids := round.Parties().IDs().Keys()
@@ -104,38 +105,39 @@ func (round *round1) Start() *tss.Error {
 
 	// generate the dlnproofs for keygen
 	h1i, h2i, alpha, beta, p, q, NTildei :=
-		preParams.H1i,
-		preParams.H2i,
-		preParams.Alpha,
-		preParams.Beta,
-		preParams.P,
-		preParams.Q,
-		preParams.NTildei
-	dlnProof1 := dlnproof.NewDLNProof(h1i, h2i, alpha, p, q, NTildei)
-	dlnProof2 := dlnproof.NewDLNProof(h2i, h1i, beta, p, q, NTildei)
+		preParams.H1i, // h1i= 随机数质数 f1的平方
+		preParams.H2i, // h2i = 随机数质数 f1的平方 的 alpha次方 即h2i = h1i ^alpha, h1i = h2i^beta
+		preParams.Alpha, // 随机数alpha
+		preParams.Beta, // 随机数 alpha的逆元
+		preParams.P, // 第一个safePrime的q,即q1
+		preParams.Q, // 第二个safePrime的q，即q2
+		preParams.NTildei // (2*q1+1)(2*q2+1)
+	dlnProof1 := dlnproof.NewDLNProof(h1i, h2i, alpha, p, q, NTildei) // h2i = h1i^alpha的NIZK 证明
+	dlnProof2 := dlnproof.NewDLNProof(h2i, h1i, beta, p, q, NTildei)  // h1i = h2i^beta的NIZK 证明
 
 	// for this P: SAVE
 	// - shareID
 	// and keep in temporary storage:
 	// - VSS Vs
 	// - our set of Shamir shares
-	round.save.ShareID = ids[i] // shareID，记录本party的ids
+	round.save.ShareID = ids[i] // shareID，记录本party的ids,key
 	round.temp.vs = vs          // 记录本party[i] 隐藏多项式系数的[g^a0, g^a1, g^a2,....]
 	round.temp.shares = shares  // 记录party[i]产生的u[i]的隐藏多项式的[ids[1], f(ids[1])], [ids[2], f(ids[2])],[ids[3], f(ids[3])]
 
 	// for this P: SAVE de-commitments, paillier keys for round 2
 	round.save.PaillierSK = preParams.PaillierSK
-	round.save.PaillierPKs[i] = &preParams.PaillierSK.PublicKey
-	round.temp.deCommitPolyG = cmt.D // 记录本party[i] 隐藏多项式系数的[r,g^a0, g^a1, g^a2,....]
+	round.save.PaillierPKs[i] = &preParams.PaillierSK.PublicKey // 记录本party的paillier publickey
+	round.temp.deCommitPolyG = cmt.D                            // 记录本party[i] 隐藏多项式系数的[r,g^a0, g^a1, g^a2,....]
 
 	// BROADCAST commitments, paillier pk + proof; round 1 message
+	// 广播party[i]产生的paillier 公钥，+ 隐藏多项式的hash[g^a0, g^a1,....] 即cmt.C, +safePrime的publickkey, NTildei,H1i,H2i，以及他们的dlnProof。
 	{
 		msg, err := NewKGRound1Message(
 			round.PartyID(), cmt.C, &preParams.PaillierSK.PublicKey, preParams.NTildei, preParams.H1i, preParams.H2i, dlnProof1, dlnProof2)
 		if err != nil {
 			return round.WrapError(err, Pi)
 		}
-		round.temp.kgRound1Messages[i] = msg
+		round.temp.kgRound1Messages[i] = msg // 假装收到了自己的round1 message
 		round.out <- msg
 	}
 	return nil
@@ -148,6 +150,7 @@ func (round *round1) CanAccept(msg tss.ParsedMessage) bool {
 	return false
 }
 
+// 检查是否收到所有party的r1msg
 func (round *round1) Update() (bool, *tss.Error) {
 	for j, msg := range round.temp.kgRound1Messages {
 		if round.ok[j] {

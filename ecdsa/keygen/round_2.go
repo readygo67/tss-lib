@@ -19,9 +19,9 @@ const (
 	paillierBitsLen = 2048
 )
 
-// round2 发送两个消息，
-// r2msg1: 把ui的share[j] 发送Pj
-// r2msg2: 把
+// round2 首先验证各个节点发过了r1msg是否正确，然后发送两个消息
+// r2msg1: 将本party 通过隐藏多项式 f(x)= a0+a1*x+a2*x^2, x = party[j].key得到的share[j] 点对点的发送Pj
+// r2msg2: 把本party的 [r, g^a0,g^a1,g^a2,...]的commitment.D
 
 func (round *round2) Start() *tss.Error {
 	if round.started {
@@ -36,7 +36,7 @@ func (round *round2) Start() *tss.Error {
 		round.PartyID(),
 		round.Concurrency(),
 	)
-	dlnVerifier := NewDlnProofVerifier(round.Concurrency())
+	dlnVerifier := NewDlnProofVerifier(round.Concurrency()) // 构造一个DLNProofVerifier,
 
 	i := round.PartyID().Index
 
@@ -45,6 +45,8 @@ func (round *round2) Start() *tss.Error {
 	dlnProof1FailCulprits := make([]*tss.PartyID, len(round.temp.kgRound1Messages))
 	dlnProof2FailCulprits := make([]*tss.PartyID, len(round.temp.kgRound1Messages))
 	wg := new(sync.WaitGroup)
+	// 检查收到的r1msg，
+	// 1. 要求所有收到的h1/h2 都不能相同
 	for j, msg := range round.temp.kgRound1Messages {
 		r1msg := msg.Content().(*KGRound1Message)
 		H1j, H2j, NTildej, paillierPKj :=
@@ -73,13 +75,14 @@ func (round *round2) Start() *tss.Error {
 		wg.Add(2)
 		_j := j
 		_msg := msg
-
+		// 如果验证h2 != h1^ alpha, 记录作恶的节点
 		dlnVerifier.VerifyDLNProof1(r1msg, H1j, H2j, NTildej, func(isValid bool) {
 			if !isValid {
 				dlnProof1FailCulprits[_j] = _msg.GetFrom() // 如果无效，记录作恶的那个party
 			}
 			wg.Done()
 		})
+		// 如果验证h1 != h1^ alpha, 记录作恶的节点 h1i = h2i^beta
 		dlnVerifier.VerifyDLNProof2(r1msg, H2j, H1j, NTildej, func(isValid bool) {
 			if !isValid {
 				dlnProof2FailCulprits[_j] = _msg.GetFrom() // /如果无效，记录作恶的那个party
@@ -142,6 +145,7 @@ func (round *round2) CanAccept(msg tss.ParsedMessage) bool {
 	return false
 }
 
+// 当收到所有party的 r2msg1和r2msg2b之后，
 func (round *round2) Update() (bool, *tss.Error) {
 	// guard - VERIFY de-commit for all Pj
 	for j, msg := range round.temp.kgRound2Message1s {

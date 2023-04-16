@@ -120,23 +120,23 @@ consumer:
 
 	P, Q := sgps[0].SafePrime(), sgps[1].SafePrime() // 产生两对safePrime, 取P1，P2 的名字更加符合  p1= 2q1+1, p2=2q2+1
 	NTildei := new(big.Int).Mul(P, Q)                // p1 * p2
-	modNTildeI := common.ModInt(NTildei)
+	modNTildeI := common.ModInt(NTildei)             // modNTildeI = p1 * p2
 
 	p, q := sgps[0].Prime(), sgps[1].Prime()                  // 产生两对safePrime, 取q1，q2 的名字更加符合
 	modPQ := common.ModInt(new(big.Int).Mul(p, q))            // q1 * q2
-	f1 := common.GetRandomPositiveRelativelyPrimeInt(NTildei) // f1 和 alpha 为一个和NTildei 的最大公约是1的数。
+	f1 := common.GetRandomPositiveRelativelyPrimeInt(NTildei) // f1 和 alpha 小于NTildei的一个质数 。
 	alpha := common.GetRandomPositiveRelativelyPrimeInt(NTildei)
-	beta := modPQ.ModInverse(alpha)   // beta = 1/alaph
+	beta := modPQ.ModInverse(alpha)   // beta = alaph 的逆元， 假设modPQ=15, 2 * 8 === 1 (mod15), 称2是8的逆元，  11 * 11 === 1（mod15）， 4*4 === 1(mod15)
 	h1i := modNTildeI.Mul(f1, f1)     // h1 = f1^2
 	h2i := modNTildeI.Exp(h1i, alpha) // h2 = h1 ^ alpha
 
 	preParams := &LocalPreParams{
 		PaillierSK: paiSK,   // paillier 的私钥
-		NTildei:    NTildei, // 两个safePrime p1/p2的乘积
-		H1i:        h1i,     // 随机数 f1的平方
-		H2i:        h2i,     // 随机数 f1的平方 * 另一个随机数alpha 的乘积
+		NTildei:    NTildei, // =p1*p2 = (2*q1+1)(2*q2+1)
+		H1i:        h1i,     // 随机数质数 f1的平方
+		H2i:        h2i,     // 随机数质数 f1的平方 的 alpha次方
 		Alpha:      alpha,   // 随机数alpha
-		Beta:       beta,    // 随机数 alpha的倒数
+		Beta:       beta,    // 随机数 alpha的逆元
 		P:          p,       // 第一个safePrime的q
 		Q:          q,       // 第二个safePrime的q
 	}

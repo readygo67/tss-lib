@@ -32,7 +32,7 @@ var (
 	one = big.NewInt(1)
 )
 
-// 产生关于 h1,h2 的一个proof。
+// 注意这里h2 = h1^x, 构建证明满足h2=h1^x关系的Distributed Linear Noninteractive Proof
 func NewDLNProof(h1, h2, x, p, q, N *big.Int) *Proof {
 	pMulQ := new(big.Int).Mul(p, q)
 	modN, modPQ := common.ModInt(N), common.ModInt(pMulQ)
@@ -40,10 +40,10 @@ func NewDLNProof(h1, h2, x, p, q, N *big.Int) *Proof {
 	alpha := [Iterations]*big.Int{}
 	for i := range alpha {
 		a[i] = common.GetRandomPositiveInt(pMulQ)
-		alpha[i] = modN.Exp(h1, a[i]) // h1^a[i] mod N
+		alpha[i] = modN.Exp(h1, a[i]) // h1^a[i] mod N, 产生128个alpha
 	}
 	msg := append([]*big.Int{h1, h2, N}, alpha[:]...) // 获得msg
-	c := common.SHA512_256i(msg...)                   // 得到msg的hash
+	c := common.SHA512_256i(msg...)                   // 计算出一个32字节长的哈希值c
 	t := [Iterations]*big.Int{}
 	cIBI := new(big.Int)
 	for i := range t {
@@ -51,7 +51,7 @@ func NewDLNProof(h1, h2, x, p, q, N *big.Int) *Proof {
 		cIBI = cIBI.SetInt64(int64(cI))
 		t[i] = modPQ.Add(a[i], modPQ.Mul(cIBI, x)) // t[i]= a[i] + 0/1 * x
 	}
-	return &Proof{alpha, t} // alpha[i] = h1^ai 作为， t[i]也包含a[i], x 的信息
+	return &Proof{alpha, t} // alpha[i] = h1^ai 作为ai的commitment， t[i]也包含a[i], x 的信息
 }
 
 func (p *Proof) Verify(h1, h2, N *big.Int) bool {
@@ -63,11 +63,11 @@ func (p *Proof) Verify(h1, h2, N *big.Int) bool {
 	}
 	modN := common.ModInt(N)
 	h1_ := new(big.Int).Mod(h1, N)
-	if h1_.Cmp(one) != 1 || h1_.Cmp(N) != -1 { // h1
+	if h1_.Cmp(one) != 1 || h1_.Cmp(N) != -1 { // 检查h1是否在有效的范围内， h1_.Cmp(one) != 1表示h1必须大于1，因为1没有办法进行指数运算。h1_.Cmp(N) != -1表示h1必须小于N，因为我们在生成DLN证明的时候使用了h1进行指数运算，如果它大于N，就无法使得指数运算的结果得到模N的值，导致验证失败。
 		return false
 	}
 	h2_ := new(big.Int).Mod(h2, N)
-	if h2_.Cmp(one) != 1 || h2_.Cmp(N) != -1 {
+	if h2_.Cmp(one) != 1 || h2_.Cmp(N) != -1 { // 检查h2 是否在(1,N)范围内
 		return false
 	}
 	if h1_.Cmp(h2_) == 0 {
@@ -75,13 +75,14 @@ func (p *Proof) Verify(h1, h2, N *big.Int) bool {
 	}
 	for i := range p.T {
 		a := new(big.Int).Mod(p.T[i], N)
-		if a.Cmp(one) != 1 || a.Cmp(N) != -1 {
+		if a.Cmp(one) != 1 || a.Cmp(N) != -1 { // 检查t[i] 是否在(1,N)范围内
 			return false
 		}
 	}
+
 	for i := range p.Alpha {
 		a := new(big.Int).Mod(p.Alpha[i], N)
-		if a.Cmp(one) != 1 || a.Cmp(N) != -1 {
+		if a.Cmp(one) != 1 || a.Cmp(N) != -1 { // 检查alpha[i] 是否在(1,N)范围内
 			return false
 		}
 	}
@@ -94,9 +95,9 @@ func (p *Proof) Verify(h1, h2, N *big.Int) bool {
 		}
 		cI := c.Bit(i)
 		cIBI = cIBI.SetInt64(int64(cI))
-		h1ExpTi := modN.Exp(h1, p.T[i])
-		h2ExpCi := modN.Exp(h2, cIBI)
-		alphaIMulH2ExpCi := modN.Mul(p.Alpha[i], h2ExpCi)
+		h1ExpTi := modN.Exp(h1, p.T[i])                   // h1ExpTi = h1^t[i]= h1^ (a[i] + 0/1 * x) = h1^a[i] 或者 h1^a[i] * h1^x
+		h2ExpCi := modN.Exp(h2, cIBI)                     // h2ExpCi = h2^(0或者1)
+		alphaIMulH2ExpCi := modN.Mul(p.Alpha[i], h2ExpCi) // alphaIMulH2ExpCi = h1^a[i] * (h2 or 1) = h1^a[i] 或者 h1^a[i] * h2（因为h2= h1^x） = h1^a[i] 或者h1^x
 		if h1ExpTi.Cmp(alphaIMulH2ExpCi) != 0 {
 			return false
 		}

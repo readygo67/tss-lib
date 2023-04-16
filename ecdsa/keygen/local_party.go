@@ -48,7 +48,7 @@ type (
 
 		// temp data (thrown away after keygen)
 		ui            *big.Int             // used for tests, 部分私钥，正式使用时应该要去掉
-		KGCs          []cmt.HashCommitment // 记录各个party的 隐藏多项式 {C=hash(g^a0, g^a1,....), D=[g^a0, g^a1, ....]}的C
+		KGCs          []cmt.HashCommitment // 记录各个party的 隐藏多项式 {C=hash(g^a0, g^a1,....), D=[g^a0, g^a1, ....]}的C，KGC = Key Generate Commitment
 		vs            vss.Vs               // 本party的[g^a0, g^a1, ....]
 		shares        vss.Shares           // 本party产生的[ids[1], f(ids[1])], [ids[2], f(ids[2])]..
 		deCommitPolyG cmt.HashDeCommitment // 本party 的隐藏多项式  D=[r, g^a0, g^a1, ....]

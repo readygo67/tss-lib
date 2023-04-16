@@ -115,7 +115,7 @@ func isOnCurve(c elliptic.Curve, x, y *big.Int) bool {
 }
 
 // ----- //
-
+// 将ecdsa 曲线上的(x,y) 坐标变成以[x, y] 数组
 func FlattenECPoints(in []*ECPoint) ([]*big.Int, error) {
 	if in == nil {
 		return nil, errors.New("FlattenECPoints encountered a nil in slice")

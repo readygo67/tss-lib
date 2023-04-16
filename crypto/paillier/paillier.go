@@ -44,7 +44,7 @@ type (
 	PrivateKey struct {
 		PublicKey
 		LambdaN, // lcm(p-1, q-1)
-		PhiN *big.Int // (p-1) * (q-1)
+		PhiN *big.Int // PhiN = (p-1) * (q-1)
 	}
 
 	// Proof uses the new GenerateXs method in GG18Spec (6)

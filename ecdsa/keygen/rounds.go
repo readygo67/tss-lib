@@ -21,7 +21,7 @@ type (
 		temp    *localTempData      // 保存localMessageStore 和其他的一些temp的信息。
 		out     chan<- tss.Message
 		end     chan<- LocalPartySaveData
-		ok      []bool // `ok` tracks parties which have been verified by Update()
+		ok      []bool // `ok` tracks parties which have been verified by Update(), 确认所有的parites 都已经完成本轮了
 		started bool
 		number  int
 	}

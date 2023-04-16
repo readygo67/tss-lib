@@ -40,8 +40,9 @@ var (
 )
 
 // Check share ids of Shamir's Secret Sharing, return error if duplicate or 0 value found
-// 检查是否有重复或者为0的的indexs
-// 为0的地方， 能够直接得到a0(即秘密)， duplicated 的indexes 会让有效参与方数量减少一个
+// indexs 为参与私钥计算的party的ID，要求
+// 不能有有重复或者为0的的indexs， 为0的地方， 能够直接得到a0(即秘密)了; duplicated 的indexes 会让有效参与方数量减少一个
+// 注意这里的=0 或者相同 都是指mod ec.Params().N 之后的结果。
 func CheckIndexes(ec elliptic.Curve, indexes []*big.Int) ([]*big.Int, error) {
 	visited := make(map[string]struct{})
 	for _, v := range indexes {
@@ -60,11 +61,11 @@ func CheckIndexes(ec elliptic.Curve, indexes []*big.Int) ([]*big.Int, error) {
 
 // Returns a new array of secret shares created by Shamir's Secret Sharing Algorithm,
 // requiring a minimum number of shares to recreate, of length shares, from the input secret
-// indexes， 总共n个shares
+// indexes， 总共n个shares，
 // threshold， t个分片就能恢复出私钥。
 // Vs[i]=C[i]= g^ai, 为ai的多项式承诺，
 // shares[i] = (xi, yi)，为每个参与方掌握的私钥分片。
-// feldman 私钥分配算法
+// feldman-Vss 私钥分配算法
 func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.Int) (Vs, Shares, error) {
 	if secret == nil || indexes == nil {
 		return nil, nil, fmt.Errorf("vss secret or indexes == nil: %v %v", secret, indexes)
@@ -97,11 +98,16 @@ func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.In
 		share := evaluatePolynomial(ec, threshold, poly, ids[i])           // yi = a0+ a1 * xi + a2 *xi^2 +...,
 		shares[i] = &Share{Threshold: threshold, ID: ids[i], Share: share} // ids[i] 为多项式中的xi，share 为多项式中的yi,得到party[i]部分私钥u[i]的多项式隐藏shares
 	}
-	return v, shares, nil // v的数量是threshold+1, shares的数量是所有的parties。
+
+	// v的数量是threshold+1, 是隐藏多项式系数的commitment
+	// shares的数量是所有的parties
+	return v, shares, nil
 }
 
 // 每一个share验证自己share的有效性，
-// vs[i] = c[i] //commitment， c[i] = g^ai，vs= 隐藏多项式[g^a0, g^a1, .....],share = (ids[i], f)
+// vs[i] = c[i] //commitment， c[i] = g^ai，vs= 隐藏多项式[g^a0, g^a1, .....],share = (ids[i], share)
+// vs[i] = g^a0, vs 是隐藏多项式[f(x)=a0 +a1*x +a2+x^2]系数[a0,a1,a2...]的隐藏[g^a0, g^a1, .....], share = {threshold, party[i]的key, f(key)}
+// Verify 函数验证 g^f(x) = g^(a0+a1*x + a2*x^2 + a3*x^3+....)。
 func (share *Share) Verify(ec elliptic.Curve, threshold int, vs Vs) bool {
 	if share.Threshold != threshold || vs == nil {
 		return false
@@ -121,10 +127,11 @@ func (share *Share) Verify(ec elliptic.Curve, threshold int, vs Vs) bool {
 		}
 	}
 
-	sigmaGi := crypto.ScalarBaseMult(ec, share.Share) // g^f(x) = g^(a0+a1*x + a2*x^2 + a3*x^3+....)
-	return sigmaGi.Equals(v)
+	sigmaGi := crypto.ScalarBaseMult(ec, share.Share) // sigmaGi = g^f(x)
+	return sigmaGi.Equals(v)                          // g^f(x) = g^(a0+a1*x + a2*x^2 + a3*x^3+....)
 }
 
+// ReConstruct 用threshold+1 个share中使用拉格朗日差值法恢复出私钥。注意这里的secret是部分一个party掌握的部分私钥。
 func (shares Shares) ReConstruct(ec elliptic.Curve) (secret *big.Int, err error) {
 	if shares != nil && shares[0].Threshold+1 > len(shares) {
 		return nil, ErrNumSharesBelowThreshold
@@ -160,7 +167,8 @@ func (shares Shares) ReConstruct(ec elliptic.Curve) (secret *big.Int, err error)
 	return secret, nil
 }
 
-// 随机产生多项式y = a0+a1*x +a2 *x^2 + a3 *x^3 + ... 中的系数， a0 = secret, a1 = 随机产生的系数
+// 随机产生多项式y = a0+a1*x +a2 *x^2 + a3 *x^3 + ... 中的系数， a0 = secret, a1 = 随机产生的系数,
+// 返回的是一个[a0, a1, a2, a3]
 func samplePolynomial(ec elliptic.Curve, threshold int, secret *big.Int) []*big.Int {
 	// q := ec.Params().N
 	v := make([]*big.Int, threshold+1)
@@ -177,6 +185,8 @@ func samplePolynomial(ec elliptic.Curve, threshold int, secret *big.Int) []*big.
 // v[]
 //
 //	returns a + bx + cx^2 + dx^3, //y=a0 +(a1 * x) + (a2 * x^2) + (a3 * x^3) + (a4 * x^4), 其中
+//
+// id 为party[i]的key
 func evaluatePolynomial(ec elliptic.Curve, threshold int, v []*big.Int, id *big.Int) (result *big.Int) {
 	q := ec.Params().N
 	modQ := common.ModInt(q)
@@ -184,8 +194,8 @@ func evaluatePolynomial(ec elliptic.Curve, threshold int, v []*big.Int, id *big.
 	X := big.NewInt(int64(1))
 	for i := 1; i <= threshold; i++ { // 逐项累加
 		ai := v[i]
-		X = modQ.Mul(X, id) // x = x^i
-		aiXi := new(big.Int).Mul(ai, X)
+		X = modQ.Mul(X, id)             // x = x^i X= id^i 即id的i次方
+		aiXi := new(big.Int).Mul(ai, X) // aiXi= ai * x^i
 		result = modQ.Add(result, aiXi)
 	}
 	return
