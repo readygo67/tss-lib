@@ -57,29 +57,29 @@ func (round *round5) Start() *tss.Error {
 	}
 
 	//
-	R = R.ScalarMult(round.temp.thetaInverse)
+	R = R.ScalarMult(round.temp.thetaInverse) // 得到R
 	N := round.Params().EC().Params().N
 	modN := common.ModInt(N)
-	rx := R.X()
+	rx := R.X() // r = rx
 	ry := R.Y()
-	si := modN.Add(modN.Mul(round.temp.m, round.temp.k), modN.Mul(rx, round.temp.sigma)) // 计算得到s[i]
+	si := modN.Add(modN.Mul(round.temp.m, round.temp.k), modN.Mul(rx, round.temp.sigma)) // 计算得到s[i]=m*k[i]+rx * sigma[i]
 
 	// clear temp.w and temp.k from memory, lint ignore
 	round.temp.w = zero
 	round.temp.k = zero
 
-	li := common.GetRandomPositiveInt(N)  // li
-	roI := common.GetRandomPositiveInt(N) // pi
-	rToSi := R.ScalarMult(si)             // 将si
-	liPoint := crypto.ScalarBaseMult(round.Params().EC(), li)
-	bigAi := crypto.ScalarBaseMult(round.Params().EC(), roI)
-	bigVi, err := rToSi.Add(liPoint) // 将si
+	li := common.GetRandomPositiveInt(N)                      // li
+	roI := common.GetRandomPositiveInt(N)                     // pi
+	rToSi := R.ScalarMult(si)                                 // R^s[i]
+	liPoint := crypto.ScalarBaseMult(round.Params().EC(), li) // liPoint = g^li
+	bigAi := crypto.ScalarBaseMult(round.Params().EC(), roI)  // bigAi = g ^ roI
+	bigVi, err := rToSi.Add(liPoint)                          // bigVi= R^s[i]+g^li
 	if err != nil {
 		return round.WrapError(errors2.Wrapf(err, "rToSi.Add(li)"))
 	}
 
-	cmt := commitments.NewHashCommitment(bigVi.X(), bigVi.Y(), bigAi.X(), bigAi.Y())
-	r5msg := NewSignRound5Message(round.PartyID(), cmt.C) // 广播s[i]的commithash.
+	cmt := commitments.NewHashCommitment(bigVi.X(), bigVi.Y(), bigAi.X(), bigAi.Y()) // 将 Ai 和 Vi 的 X 和 Y 坐标作为输入参数，生成承诺（commitment）cmt。即将 X 和 Y 坐标作为输入值哈希为一个值，并将哈希值作为承诺的一部分
+	r5msg := NewSignRound5Message(round.PartyID(), cmt.C)                            //
 	round.temp.signRound5Messages[round.PartyID().Index] = r5msg
 	round.out <- r5msg
 

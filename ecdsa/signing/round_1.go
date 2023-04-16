@@ -29,12 +29,24 @@ func newRound1(params *tss.Parameters, key *keygen.LocalPartySaveData, data *com
 		&base{params, key, data, temp, out, end, make([]bool, len(params.Parties().IDs())), false, 1}}
 }
 
-// round1,party[i] 随机产生k 和gamma, 并将k 通过mta 发送给party[j]
-// round2, party[j] 将从party[i] 传过来的k[i] 和本地的gamma[j] 以及w[j] 相乘，然后随机选择-beta[j]，v[j] 并将 k[i] * gamma[j] - beta[j], k[i]*w[i] - v[j]的密文发送给party[i]
-// round3, party[i] 将收集到的 (k[i] * gamma[j] - beta[j], k[i]*w[j] - v[j]) 计算得到自己的theta[i],sigmma[i], 并将theta[i] 广播出去
-// round4, party[i] 收集到所有的theta[i]之后，计算 k * gamma = Sum(theta[i]), 并将本地gamma[i] 将gamma的ZKP 和 commitment 广播
+// round1,party[i] 随机产生k 和gamma,
+// 1. r1msg1：将用mta对k加密后的密文cA 和rangeProof 发送给party[j]
+// 2. r1msg2: 广播g^gamma[i]的commitment
+
+// round2, 做了两次MtA
+// 1. party[j] 将从party[i] 传过来的k[i] 和本地的gamma[j] 相乘，然后随机选择-beta[j]， 并将 (k[i] * gamma[j] - beta[j]) 的密文及其range证明发回给party[i]，为求k*gamma准备
+// 2. party[j] 将从party[i] 传过来的k[i] 和本地的w[j] 相乘，然后随机选择v[j]， 并将 (k[i] * w[j] - v[j]) 的密文及其range证明发回给party[i], 为求si做准备
+
+// round3,
+// 1. party[i] 计算alpha[i]= k[i] * gamma[j] - beta[j], u[i]= k[i]*w[j] - v[j]
+// 2. thelta[i] = ki*gammai + sum(alpha[i][i]) + sum(beta[j][i]), 为生成r做准备
+// 3. sigma[i] = ki*wi + sum(u[i][j]) + sum(v[j][i])， 为生成s做准备
+// 4. 将thelta[i]广播出去
+
+// round4, party[i] 收集到所有的theta[i]之后，计算 k * gamma = Sum(theta[i]), 并将本地gamma[i] 将gamma[i]的ZKP 和 deCommitment 广播
 // round5, party[i] 验证gamma[j]的proof之后，获得r, s[i], 计算s[i] 的proof并广播
-// round6/7/8，party[i] 交互s[i]的proof
+
+// round6/7/8，party[i] 交互s[i]的proof, 没有看的太明白
 // round9 将party[i] 的s[i]广播出去。
 // finalize，将Sum(s[i]) 汇总形成签名s。
 
@@ -55,10 +67,10 @@ func (round *round1) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
-	k := common.GetRandomPositiveInt(round.Params().EC().Params().N)
-	gamma := common.GetRandomPositiveInt(round.Params().EC().Params().N)
+	k := common.GetRandomPositiveInt(round.Params().EC().Params().N)     // 随机生成k[i]
+	gamma := common.GetRandomPositiveInt(round.Params().EC().Params().N) // 随机生成gamma[i]
 
-	pointGamma := crypto.ScalarBaseMult(round.Params().EC(), gamma)
+	pointGamma := crypto.ScalarBaseMult(round.Params().EC(), gamma) // pointGamma[i] = g^gamma[i]
 	cmt := commitments.NewHashCommitment(pointGamma.X(), pointGamma.Y())
 	round.temp.k = k
 	round.temp.gamma = gamma
@@ -72,16 +84,16 @@ func (round *round1) Start() *tss.Error {
 		if j == i {
 			continue
 		}
-		cA, pi, err := mta.AliceInit(round.Params().EC(), round.key.PaillierPKs[i], k, round.key.NTildej[j], round.key.H1j[j], round.key.H2j[j]) // 将ki 发送给 party[j]
+		cA, rangProof, err := mta.AliceInit(round.Params().EC(), round.key.PaillierPKs[i], k, round.key.NTildej[j], round.key.H1j[j], round.key.H2j[j]) // 将k[i] 发送给 party[j]
 		if err != nil {
 			return round.WrapError(fmt.Errorf("failed to init mta: %v", err))
 		}
-		r1msg1 := NewSignRound1Message1(Pj, round.PartyID(), cA, pi) // to Pj, from: Partyi, cA 为密文， pi 为cA的proof。
-		round.temp.cis[j] = cA                                       // cis[j] 记录发给partyj 的密文。
+		r1msg1 := NewSignRound1Message1(Pj, round.PartyID(), cA, rangProof) // to Pj, from: Pi, cA 为密文， rangProof 为cA的proof。
+		round.temp.cis[j] = cA                                              // cis[j] 记录发给Pj 的密文。
 		round.out <- r1msg1
 	}
 
-	r1msg2 := NewSignRound1Message2(round.PartyID(), cmt.C) // 广播g^gamma[i]
+	r1msg2 := NewSignRound1Message2(round.PartyID(), cmt.C) // 广播g^gamma[i]的commitment
 	round.temp.signRound1Message2s[i] = r1msg2
 	round.out <- r1msg2
 

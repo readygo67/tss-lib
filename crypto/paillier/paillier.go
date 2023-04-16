@@ -121,7 +121,7 @@ func (publicKey *PublicKey) EncryptAndReturnRandomness(m *big.Int) (c *big.Int, 
 	// 2. x^N mod N2, xN = x^N
 	xN := new(big.Int).Exp(x, publicKey.N, N2)
 	// 3. (1) * (2) mod N2
-	c = common.ModInt(N2).Mul(Gm, xN)
+	c = common.ModInt(N2).Mul(Gm, xN) // C=(g^a * r^n)modn^2
 	return
 }
 

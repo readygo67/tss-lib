@@ -27,7 +27,7 @@ func (round *round9) Start() *tss.Error {
 		if j == round.PartyID().Index {
 			continue
 		}
-
+		// 验证r7msg 和r8msg
 		r7msg := round.temp.signRound7Messages[j].Content().(*SignRound7Message)
 		r8msg := round.temp.signRound8Messages[j].Content().(*SignRound8Message)
 		cj, dj := r7msg.UnmarshalCommitment(), r8msg.UnmarshalDeCommitment()

@@ -57,8 +57,8 @@ func (round *round2) Start() *tss.Error {
 				round.key.H2j[i])
 			// should be thread safe as these are pre-allocated
 			round.temp.betas[j] = beta   // 记录传给party[j]的beta
-			round.temp.c1jis[j] = c1ji   // cipher(k*gamma-beta)
-			round.temp.pi1jis[j] = pi1ji // proof(cipher(k*gamma-beta))
+			round.temp.c1jis[j] = c1ji   // c1jis[j] 为(k[i]* gamma[j] - beta)的密文
+			round.temp.pi1jis[j] = pi1ji // proof((k[i]* gamma[j] - beta)的密文)
 			if err != nil {
 				errChs <- round.WrapError(err, Pj)
 			}
@@ -103,13 +103,15 @@ func (round *round2) Start() *tss.Error {
 	if len(culprits) > 0 {
 		return round.WrapError(errors.New("failed to calculate Bob_mid or Bob_mid_wc"), culprits...)
 	}
+
 	// create and send messages
 	for j, Pj := range round.Parties().IDs() {
 		if j == i {
 			continue
 		}
+		// temp.c1jis[j] = cipher(k[i]*gamma[j] - beta[j]), temp.c2jis[j] = cipher(k[i]*w[j] - v[j])
 		r2msg := NewSignRound2Message(
-			Pj, round.PartyID(), round.temp.c1jis[j], round.temp.pi1jis[j], round.temp.c2jis[j], round.temp.pi2jis[j])
+			Pj, round.PartyID(), round.temp.c1jis[j], round.temp.pi1jis[j], round.temp.c2jis[j], round.temp.pi2jis[j]) //
 		round.out <- r2msg
 	}
 	return nil

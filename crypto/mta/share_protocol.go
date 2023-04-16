@@ -21,7 +21,7 @@ func AliceInit(
 	pkA *paillier.PublicKey,
 	a, NTildeB, h1B, h2B *big.Int,
 ) (cA *big.Int, pf *RangeProofAlice, err error) {
-	cA, rA, err := pkA.EncryptAndReturnRandomness(a) // cA为密文， rA为随机水
+	cA, rA, err := pkA.EncryptAndReturnRandomness(a) // cA为密文， rA为随机数
 	if err != nil {
 		return nil, nil, err
 	}
@@ -29,6 +29,7 @@ func AliceInit(
 	return cA, pf, err
 }
 
+// BobMid 实现 a*b=alpha+beta 同态加密
 func BobMid(
 	ec elliptic.Curve,
 	pkA *paillier.PublicKey,
@@ -41,23 +42,24 @@ func BobMid(
 	}
 	q := ec.Params().N
 	betaPrm = common.GetRandomPositiveInt(pkA.N)
-	cBetaPrm, cRand, err := pkA.EncryptAndReturnRandomness(betaPrm) // cBeta 为加密后的betaPrm, beta为随机选择的
+	cBetaPrm, cRand, err := pkA.EncryptAndReturnRandomness(betaPrm) // cBeta 为加密后的betaPrm, betaPrm为随机选择的
 	if err != nil {
 		return
 	}
-	cB, err = pkA.HomoMult(b, cA) // cA = cipher(ki), cB =  party[i]的gamma明文和 party[j]的k的密文相乘，
+	cB, err = pkA.HomoMult(b, cA) // cA = cipher(ki), cB = b*cA, 同态乘法
 	if err != nil {
 		return
 	}
-	cB, err = pkA.HomoAdd(cB, cBetaPrm)
+	cB, err = pkA.HomoAdd(cB, cBetaPrm) // cB= b*cA + cBetaPrm, 同态加法
 	if err != nil {
 		return
 	}
-	beta = common.ModInt(q).Sub(zero, betaPrm) // 获得-beta
-	piB, err = ProveBob(ec, pkA, NTildeA, h1A, h2A, cA, cB, b, betaPrm, cRand)
+	beta = common.ModInt(q).Sub(zero, betaPrm)                                 // beta = betaPrm,
+	piB, err = ProveBob(ec, pkA, NTildeA, h1A, h2A, cA, cB, b, betaPrm, cRand) // piB =rangeProofB
 	return
 }
 
+// BobMidWC 为第二个MtA，为求s准备
 func BobMidWC(
 	ec elliptic.Curve,
 	pkA *paillier.PublicKey,
@@ -75,7 +77,7 @@ func BobMidWC(
 	if err != nil {
 		return
 	}
-	cB, err = pkA.HomoMult(b, cA) // cA = cipher(ki), cB =  party[i]的w 明文和 party[j]的k的密文相乘，为求s做准备
+	cB, err = pkA.HomoMult(b, cA)
 	if err != nil {
 		return
 	}

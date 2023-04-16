@@ -41,12 +41,12 @@ func (round *round4) Start() *tss.Error {
 
 	// compute the multiplicative inverse thelta mod q
 	thetaInverse = modN.ModInverse(thetaInverse)
-	piGamma, err := schnorr.NewZKProof(round.temp.gamma, round.temp.pointGamma) // 生成gamma的proof
+	piGamma, err := schnorr.NewZKProof(round.temp.gamma, round.temp.pointGamma) // 生成gamma[i]的proof
 	if err != nil {
 		return round.WrapError(errors2.Wrapf(err, "NewZKProof(gamma, bigGamma)"))
 	}
 	round.temp.thetaInverse = thetaInverse
-	r4msg := NewSignRound4Message(round.PartyID(), round.temp.deCommit, piGamma) // 将gamma的ZKP 和 commitment 广播
+	r4msg := NewSignRound4Message(round.PartyID(), round.temp.deCommit, piGamma) // 将gamma[i]的ZKP 和 commitment 广播
 	round.temp.signRound4Messages[round.PartyID().Index] = r4msg
 	round.out <- r4msg
 

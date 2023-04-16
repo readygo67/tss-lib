@@ -26,6 +26,7 @@ func (round *round7) Start() *tss.Error {
 	round.started = true
 	round.resetOK()
 
+	// 验证r5msg, r6msg
 	bigVjs := make([]*crypto.ECPoint, len(round.Parties().IDs()))
 	bigAjs := make([]*crypto.ECPoint, len(round.Parties().IDs()))
 	for j, Pj := range round.Parties().IDs() {

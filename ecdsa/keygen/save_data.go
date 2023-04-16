@@ -17,11 +17,12 @@ import (
 )
 
 type (
+	// 本地的Paillier参数
 	LocalPreParams struct {
 		PaillierSK *paillier.PrivateKey //
-		NTildei,   // 两个safePrime p1/p2的乘积
-		H1i, H2i, // H1i随机数 f1的平方, H2i随机数 f1的平方 * 另一个随机数alpha 的乘积
-		Alpha, Beta, // 随机数alpha, beta = 1/alpha
+		NTildei, // 两个safePrime p1/p2的乘积
+		H1i, H2i, // H1i随机数 f1的平方, H2i = h1i ^ alpha
+		Alpha, Beta, // 随机数alpha, beta = alpha的逆元
 		P, Q *big.Int // 第一个safePrime的q, 第二个safePrime的q
 	}
 
@@ -39,7 +40,7 @@ type (
 		Ks []*big.Int // Keys，//Keys 记录各个party的key
 
 		// n-tilde, h1, h2 for range proofs
-		NTildej, H1j, H2j []*big.Int // 记录每一个party的n-tilde,h1, h2
+		NTildej, H1j, H2j []*big.Int // 记录各个party的NTildej, H1j, H2j
 
 		// public keys (Xj = uj*G for each Pj)
 		BigXj       []*crypto.ECPoint     // 记录每一个party的私钥分片u[j]对应的隐藏多项式之和对各个ids[]的结果

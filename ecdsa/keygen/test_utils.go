@@ -53,8 +53,8 @@ func LoadKeygenTestFixtures(qty int, optionalStart ...int) ([]LocalPartySaveData
 				"could not unmarshal fixture data for party %d located at: %s",
 				i, fixtureFilePath)
 		}
-		for _, kbxj := range key.BigXj { // key.BigXj 为party[i] 持有私钥u[i]的公钥(X[j] = g * u[i])
-			kbxj.SetCurve(tss.S256())
+		for _, kbxj := range key.BigXj { //
+			kbxj.SetCurve(tss.S256()) // 设置曲线类型
 		}
 		key.ECDSAPub.SetCurve(tss.S256())
 		keys = append(keys, key)

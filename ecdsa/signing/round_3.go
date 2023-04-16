@@ -47,6 +47,7 @@ func (round *round3) Start() *tss.Error {
 				errChs <- round.WrapError(errorspkg.Wrapf(err, "UnmarshalProofBob failed"), Pj)
 				return
 			}
+			// alpha[i]=  k[i] * gamma[j] - beta[j]
 			alphaIj, err := mta.AliceEnd(
 				round.Params().EC(),
 				round.key.PaillierPKs[i],
@@ -71,6 +72,7 @@ func (round *round3) Start() *tss.Error {
 				errChs <- round.WrapError(errorspkg.Wrapf(err, "UnmarshalProofBobWC failed"), Pj)
 				return
 			}
+			// u[i]=  k[i] * w[j] - v[j]
 			uIj, err := mta.AliceEndWC(
 				round.Params().EC(),
 				round.key.PaillierPKs[i],
@@ -101,15 +103,15 @@ func (round *round3) Start() *tss.Error {
 	}
 
 	modN := common.ModInt(round.Params().EC().Params().N)
-	thelta := modN.Mul(round.temp.k, round.temp.gamma)
-	sigma := modN.Mul(round.temp.k, round.temp.w)
+	thelta := modN.Mul(round.temp.k, round.temp.gamma) // thelta = k * gamma
+	sigma := modN.Mul(round.temp.k, round.temp.w)      // sigma = k*w
 
 	for j := range round.Parties().IDs() {
 		if j == round.PartyID().Index {
 			continue
 		}
-		thelta = modN.Add(thelta, alphas[j].Add(alphas[j], round.temp.betas[j])) // k*gamma = Sum(ki*gammai, alapha[i][i] + beta[j][i])
-		sigma = modN.Add(sigma, us[j].Add(us[j], round.temp.vs[j]))              // k*w = Sum(ki*wi,u[i][i],v[j][i])
+		thelta = modN.Add(thelta, alphas[j].Add(alphas[j], round.temp.betas[j])) // thelta[i] = ki*gammai + sum(alpha[i][i]) + sum(beta[j][i]), 为生成r做准备
+		sigma = modN.Add(sigma, us[j].Add(us[j], round.temp.vs[j]))              // sigma[i] = ki*wi + sum(u[i][j]) + sum(v[j][i])， 为生成s做准备
 	}
 
 	round.temp.theta = thelta

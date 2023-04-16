@@ -33,7 +33,7 @@ func (round *finalization) Start() *tss.Error {
 			continue
 		}
 		r9msg := round.temp.signRound9Messages[j].Content().(*SignRound9Message)
-		sumS = modN.Add(sumS, r9msg.UnmarshalS())
+		sumS = modN.Add(sumS, r9msg.UnmarshalS()) // 将各个party的s[i] 累加起来，得到s
 	}
 
 	recid := 0
@@ -68,7 +68,7 @@ func (round *finalization) Start() *tss.Error {
 		X:     round.key.ECDSAPub.X(),
 		Y:     round.key.ECDSAPub.Y(),
 	}
-	ok := ecdsa.Verify(&pk, round.temp.m.Bytes(), round.temp.rx, sumS)
+	ok := ecdsa.Verify(&pk, round.temp.m.Bytes(), round.temp.rx, sumS) // 本地验证签名
 	if !ok {
 		return round.WrapError(fmt.Errorf("signature verification failed"))
 	}
