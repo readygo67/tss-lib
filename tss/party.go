@@ -160,10 +160,10 @@ func BaseUpdate(p Party, msg ParsedMessage, task string) (ok bool, err *Error) {
 	}
 	if p.round() != nil {
 		common.Logger.Debugf("party %s: %s round %d update", p.round().Params().PartyID(), task, p.round().RoundNumber())
-		if _, err := p.round().Update(); err != nil {
+		if _, err := p.round().Update(); err != nil { // update 中检查消息是否可以accept
 			return r(false, err)
 		}
-		if p.round().CanProceed() {
+		if p.round().CanProceed() { // round k 所有的消息都收到的话，开始round k+1，在k+1中处理上一轮收到的消息。
 			if p.advance(); p.round() != nil {
 				if err := p.round().Start(); err != nil {
 					return r(false, err)
