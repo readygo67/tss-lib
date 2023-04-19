@@ -10,6 +10,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -28,56 +29,6 @@ import (
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/stretchr/testify/assert"
 )
-
-func buildP2PConnections(pIDs tss.SortedPartyIDs) [][]network.Stream {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	prvStrs := []string{
-		"659c9dd58b8464676d95ca358c40f0eba281e5344e1bba336a7df8c10a8e4edc",
-		"37db260492a73cda835d297669db8449e1648d8126dfa4885ea636ec59da7d4c",
-		"00ec12a6bac08410276e3d86760eab997d153dbde1a7eeea3872eaf8ca5e2d1a",
-		"8677d9720accbe178088777f3d41bfe653b9c5348eb6e8c78333e708a5f9ceef",
-	}
-	ports := []int{20000, 20001, 20002, 20003}
-	hosts := make([]host.Host, 0)
-	conns := make([][]network.Stream, 0)
-	for i := range pIDs {
-		h, err := makeHost(ports[i], prvStrs[i])
-		if err != nil {
-			log.Println(err)
-			return nil
-		}
-		hosts = append(hosts, h)
-	}
-
-	for _, h := range hosts {
-		// log.Printf("%v's ID:%v", i, h.ID())
-		startPeer(ctx, h, handleStreamWithHash)
-		// fmt.Printf("%v privatekey:%v\n", i, h.Peerstore().PrivKey(h.ID()))
-	}
-
-	// h1 concect to h2，建立全连接
-	for i, h1 := range hosts {
-		temp := make([]network.Stream, 0)
-		for j, h2 := range hosts {
-			if i == j {
-				temp = append(temp, nil) // 自己到自己的connection 为nil
-			} else {
-				addrs := strings.Split(h2.Addrs()[0].String(), "/")
-				dest := fmt.Sprintf("/ip4/127.0.0.1/tcp/%v/p2p/%s", addrs[len(addrs)-1], h2.ID().Pretty())
-				conn, err := startPeerAndConnect(ctx, h1, dest)
-				if err != nil {
-					log.Println(err)
-					return nil
-				}
-				temp = append(temp, conn)
-			}
-		}
-		conns = append(conns, temp)
-	}
-
-	return conns
-}
 
 func buildP2PConnectionsBWParties(parties []*LocalParty) [][]network.Stream {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -100,9 +51,9 @@ func buildP2PConnectionsBWParties(parties []*LocalParty) [][]network.Stream {
 		hosts = append(hosts, h)
 	}
 
-	for _, h := range hosts {
+	for i, h := range hosts {
 		// log.Printf("%v's ID:%v", i, h.ID())
-		startPeer(ctx, h, handleStreamWithHash)
+		startPeer(ctx, h, parties[i].HandleStream)
 		// fmt.Printf("%v privatekey:%v\n", i, h.Peerstore().PrivKey(h.ID()))
 	}
 
@@ -111,17 +62,17 @@ func buildP2PConnectionsBWParties(parties []*LocalParty) [][]network.Stream {
 		temp := make([]network.Stream, 0)
 		for j, h2 := range hosts {
 			if i == j {
-				continue
+				temp = append(temp, nil)
+			} else {
+				addrs := strings.Split(h2.Addrs()[0].String(), "/")
+				dest := fmt.Sprintf("/ip4/127.0.0.1/tcp/%v/p2p/%s", addrs[len(addrs)-1], h2.ID().Pretty())
+				conn, err := startPeerAndConnect(ctx, h1, dest)
+				if err != nil {
+					log.Println(err)
+					return nil
+				}
+				temp = append(temp, conn)
 			}
-
-			addrs := strings.Split(h2.Addrs()[0].String(), "/")
-			dest := fmt.Sprintf("/ip4/127.0.0.1/tcp/%v/p2p/%s", addrs[len(addrs)-1], h2.ID().Pretty())
-			conn, err := startPeerAndConnect(ctx, h1, dest)
-			if err != nil {
-				log.Println(err)
-				return nil
-			}
-			temp = append(temp, conn)
 		}
 		conns = append(conns, temp)
 	}
@@ -129,64 +80,11 @@ func buildP2PConnectionsBWParties(parties []*LocalParty) [][]network.Stream {
 	return conns
 }
 
-// TODO(keep), 通过pIDs 建立P2P 连接
-func Test2PConnections(t *testing.T) {
+func Test2PConnectionsWithInChannel(t *testing.T) {
 	setUp("debug")
 
-	threshold := 2
-	partyCount := 4
-	fixtures, pIDs, err := LoadKeygenTestFixtures(partyCount)
-	if err != nil {
-		common.Logger.Info("No test fixtures were found, so the safe primes will be generated from scratch. This may take a while...")
-		pIDs = tss.GenerateTestPartyIDs(partyCount)
-	}
-
-	p2pCtx := tss.NewPeerContext(pIDs)
-	parties := make([]*LocalParty, 0, len(pIDs))
-
-	outCh := make(chan tss.Message, len(pIDs))
-	endCh := make(chan LocalPartySaveData, len(pIDs))
-
-	// build the parties
-	for i := 0; i < len(pIDs); i++ {
-		var P *LocalParty
-		params := tss.NewParameters(tss.S256(), p2pCtx, pIDs[i], len(pIDs), threshold)
-		if i < len(fixtures) {
-			P = NewLocalParty(params, outCh, endCh, fixtures[i].LocalPreParams).(*LocalParty)
-		} else {
-			P = NewLocalParty(params, outCh, endCh).(*LocalParty)
-		}
-		parties = append(parties, P)
-	}
-
-	conns := buildP2PConnections(pIDs)
-
-	h1Conns := conns[0][:]
-
-	// h1 send message to others
-	for _, conn := range h1Conns {
-		if conn != nil {
-			// writeData1(conn, "hello")
-			writeDataWithHash(conn, "hello")
-		}
-	}
-
-	time.Sleep(10 * time.Second)
-
-	for _, conn := range h1Conns {
-		if conn != nil {
-			writeDataWithHash(conn, "nice to see you, miss you so much")
-		}
-	}
-
-	select {}
-}
-
-func Test2PConnectionsBWParties(t *testing.T) {
-	setUp("debug")
-
-	threshold := 2
-	partyCount := 4
+	threshold := 1
+	partyCount := 2
 	fixtures, pIDs, err := LoadKeygenTestFixtures(partyCount)
 	if err != nil {
 		common.Logger.Info("No test fixtures were found, so the safe primes will be generated from scratch. This may take a while...")
@@ -219,21 +117,20 @@ func Test2PConnectionsBWParties(t *testing.T) {
 	for _, conn := range h1Conns {
 		if conn != nil {
 			// writeData1(conn, "hello")
-			writeDataWithHash(conn, "hello")
+			writeStream([]byte("hello"), conn)
 		}
 	}
 
 	time.Sleep(10 * time.Second)
-
 	for _, conn := range h1Conns {
 		if conn != nil {
-			writeDataWithHash(conn, "nice to see you, miss you so much")
+			writeStream([]byte("nice to see you, miss you so much"), conn)
 		}
 	}
-
 	select {}
 }
 
+//
 func Test_DKG_3_4_WithLocalTestData(t *testing.T) {
 	setUp("debug")
 
@@ -269,7 +166,7 @@ func Test_DKG_3_4_WithLocalTestData(t *testing.T) {
 
 	}
 
-	// start  the parties
+	// start parties
 	for _, P := range parties {
 		go func(P *LocalParty) {
 			if err := P.Start(); err != nil {
@@ -567,6 +464,12 @@ keygen:
 	}
 }
 
+type MessageBody struct {
+	Routing tss.MessageRouting
+	Payload []byte
+}
+
+// TODO(keep),在p2p connection中去update
 func Test_DKG_3_4_WithP2PConnections(t *testing.T) {
 	setUp("debug")
 
@@ -585,8 +488,6 @@ func Test_DKG_3_4_WithP2PConnections(t *testing.T) {
 	outCh := make(chan tss.Message, len(pIDs))
 	endCh := make(chan LocalPartySaveData, len(pIDs))
 
-	updater := test.SharedPartyUpdater
-
 	startGR := runtime.NumGoroutine()
 
 	// init the parties
@@ -599,7 +500,6 @@ func Test_DKG_3_4_WithP2PConnections(t *testing.T) {
 			P = NewLocalParty(params, outCh, endCh).(*LocalParty)
 		}
 		parties = append(parties, P)
-
 	}
 
 	conns := buildP2PConnectionsBWParties(parties)
@@ -627,23 +527,50 @@ keygen:
 		case msg := <-outCh:
 			dest := msg.GetTo()
 			if dest == nil { // broadcast!
-				for _, P := range parties {
+				for _, party := range parties {
 					fromIndex := msg.GetFrom().Index
-					toIndex := P.PartyID().Index
-					if P.PartyID().Index == msg.GetFrom().Index {
+					toIndex := party.PartyID().Index
+					if party.PartyID().Index == msg.GetFrom().Index {
 						continue
 					}
 
-					writeDataWithHash(conns[fromIndex][toIndex], msg.String())
+					//
+					payload, routing, err := msg.WireBytes()
+					body := MessageBody{
+						Routing: *routing,
+						Payload: payload,
+					}
 
-					go updater(P, msg, errCh)
+					bz, err := json.Marshal(body)
+					if err != nil {
+						errCh <- party.WrapError(err)
+						return
+					}
+
+					writeStream(bz, conns[fromIndex][toIndex])
 				}
 			} else { // point-to-point!
+				fromIndex := msg.GetFrom().Index
+				toIndex := dest[0].Index
+				party := parties[fromIndex]
 				if dest[0].Index == msg.GetFrom().Index {
 					t.Fatalf("party %d tried to send a message to itself (%d)", dest[0].Index, msg.GetFrom().Index)
 					return
 				}
-				go updater(parties[dest[0].Index], msg, errCh)
+
+				payload, routing, err := msg.WireBytes()
+				body := MessageBody{
+					Routing: *routing,
+					Payload: payload,
+				}
+
+				bz, err := json.Marshal(body)
+				if err != nil {
+					errCh <- party.WrapError(err)
+					return
+				}
+
+				writeStream(bz, conns[fromIndex][toIndex])
 			}
 
 		case save := <-endCh:
@@ -742,6 +669,33 @@ keygen:
 
 				break keygen
 			}
+		}
+	}
+}
+
+func (party *LocalParty) HandleStream(s network.Stream) {
+	log.Printf("party %v Got a new stream!", party.PartyID().String())
+	for {
+		data, err := readStream(s)
+		if err != nil {
+			log.Printf("err:%v", err)
+		}
+
+		var body MessageBody
+
+		err = json.Unmarshal(data, &body)
+		if err != nil {
+			log.Printf("err:%v", err)
+		}
+
+		log.Printf("@@@, party:%v receive message from:%v\n", party.PartyID().String(), body.Routing.From)
+		parsedMsg, err := tss.ParseWireMessage(body.Payload, body.Routing.From, body.Routing.IsBroadcast)
+		if err != nil {
+			log.Printf("err:%v", err)
+		}
+
+		if _, err := party.Update(parsedMsg); err != nil {
+			log.Printf("err:%v", err)
 		}
 	}
 }

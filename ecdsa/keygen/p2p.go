@@ -31,11 +31,12 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
-	"flag"
 	"fmt"
+	"io"
 	"log"
-	"os"
+	"time"
 
 	"github.com/libp2p/go-libp2p"
 	tls "github.com/libp2p/go-libp2p/p2p/security/tls"
@@ -48,84 +49,16 @@ import (
 	"github.com/libp2p/go-libp2p/core/peerstore"
 )
 
-func handleStream(s network.Stream) {
-	log.Println("Got a new stream!")
+// applyDeadline will be true , and only disable it when we are doing test
+// the reason being the p2p network , mocknet, mock stream doesn't support SetReadDeadline ,SetWriteDeadline feature
+var ApplyDeadline = false
 
-	// Create a buffer stream for non blocking read and write.
-	rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-
-	go readData(rw)
-	go writeData(rw)
-
-	// stream 's' will stay open until you close it (or the other side closes it).
-}
-
-func readData(rw *bufio.ReadWriter) {
-	for {
-		str, _ := rw.ReadString('\n')
-
-		if str == "" {
-			return
-		}
-		if str != "\n" {
-			// Green console colour: 	\x1b[32m
-			// Reset console colour: 	\x1b[0m
-			fmt.Printf("\x1b[32m%s\x1b[0m> ", str)
-		}
-
-	}
-}
-
-func writeData(rw *bufio.ReadWriter) {
-	stdReader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Print("> ")
-		sendData, err := stdReader.ReadString('\n')
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		rw.WriteString(fmt.Sprintf("%s\n", sendData))
-		rw.Flush()
-	}
-}
-
-func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sourcePort := flag.Int("sp", 0, "Source port number")
-	dest := flag.String("d", "", "Destination multiaddr string")
-	priv := flag.String("p", "", "secp256k1 private key string")
-
-	flag.Parse()
-
-	h, err := makeHost(*sourcePort, *priv)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	if *dest == "" {
-		startPeer(ctx, h, handleStream)
-	} else {
-		_, err := startPeerAndConnect(ctx, h, *dest)
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		// Create a thread to read and write data.
-		// go writeData(rw)
-		// go readData(rw)
-
-	}
-
-	// Wait forever
-	select {}
-}
+var (
+	LengthHeader        = 4 // LengthHeader represent how many bytes we used as header
+	TimeoutReadPayload  = time.Second * 10
+	TimeoutWritePayload = time.Second * 10
+	MaxPayload          = uint32(20000000) // 20M
+)
 
 func makeHost(port int, str string) (host.Host, error) {
 	var prvKey crypto.PrivKey
@@ -181,21 +114,9 @@ func startPeer(ctx context.Context, h host.Host, streamHandler network.StreamHan
 		log.Println("was not able to find actual local port")
 		return
 	}
-
-	log.Printf("Run './chat -d /ip4/127.0.0.1/tcp/%v/p2p/%s' on another console.\n", port, h.ID().Pretty())
-	log.Println("You can replace 127.0.0.1 with public IP as well.")
-	log.Println("Waiting for incoming connection")
-	log.Println()
 }
 
 func startPeerAndConnect(ctx context.Context, h host.Host, destination string) (network.Stream, error) {
-	log.Println("This node's multiaddresses:")
-	for _, la := range h.Addrs() {
-		log.Printf(" - %v\n", la)
-	}
-	log.Println()
-
-	// Turn the destination into a multiaddr.
 	maddr, err := multiaddr.NewMultiaddr(destination)
 	if err != nil {
 		log.Println(err)
@@ -220,10 +141,67 @@ func startPeerAndConnect(ctx context.Context, h host.Host, destination string) (
 		log.Println(err)
 		return nil, err
 	}
-	log.Println("Established connection to destination")
 
 	// // Create a buffered stream so that read and writes are non blocking.
 	// rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
 
 	return s, nil
+}
+
+func writeStream(msg []byte, stream network.Stream) error {
+	length := uint32(len(msg))
+	lengthBytes := make([]byte, LengthHeader)
+	binary.LittleEndian.PutUint32(lengthBytes, length)
+	if ApplyDeadline {
+		if err := stream.SetWriteDeadline(time.Now().Add(TimeoutWritePayload)); nil != err {
+			if errReset := stream.Reset(); errReset != nil {
+				return errReset
+			}
+			return err
+		}
+	}
+	w := bufio.NewWriter(stream)
+	n, err := w.Write(lengthBytes)
+	if n != LengthHeader || err != nil {
+		return fmt.Errorf("fail to write head: %w", err)
+	}
+	n, err = w.Write(msg)
+	if err != nil {
+		return err
+	}
+	if uint32(n) != length {
+		return fmt.Errorf("short write, we would like to write: %d, however we only write: %d", length, n)
+	}
+	err = w.Flush()
+	if err != nil {
+		return fmt.Errorf("fail to flush stream: %w", err)
+	}
+	return nil
+}
+
+func readStream(stream network.Stream) ([]byte, error) {
+	if ApplyDeadline {
+		if err := stream.SetReadDeadline(time.Now().Add(TimeoutReadPayload)); nil != err {
+			if errReset := stream.Reset(); errReset != nil {
+				return nil, errReset
+			}
+			return nil, err
+		}
+	}
+	streamReader := bufio.NewReader(stream)
+	lengthBytes := make([]byte, LengthHeader)
+	n, err := io.ReadFull(streamReader, lengthBytes)
+	if n != LengthHeader || err != nil {
+		return nil, fmt.Errorf("error in read the message head %w", err)
+	}
+	length := binary.LittleEndian.Uint32(lengthBytes)
+	if length > MaxPayload {
+		return nil, fmt.Errorf("payload length:%d exceed max payload length:%d", length, MaxPayload)
+	}
+	dataBuf := make([]byte, length)
+	n, err = io.ReadFull(streamReader, dataBuf)
+	if uint32(n) != length || err != nil {
+		return nil, fmt.Errorf("short read err(%w), we would like to read: %d, however we only read: %d", err, length, n)
+	}
+	return dataBuf, nil
 }
