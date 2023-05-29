@@ -23,11 +23,12 @@ var (
 )
 
 // round 1 represents round 1 of the keygen part of the GG18 ECDSA TSS spec (Gennaro, Goldfeder; 2018)
-// round1: 广播party[i]产生的paillier 公钥，+ 隐藏多项式的hash[g^a0, g^a1,....], +safePrime的NTildei,H1i,H2i，以及他们的dlnProof。
+// round1:  每个party产生部分私钥，隐藏多项式 和paillier 密钥对
+// round1: 广播party[i]产生的paillier 公钥， 隐藏多项式的承诺hash[g^a0, g^a1,....], safePrime的NTildei,H1i,H2i，以及他们的dlnProof。
 
 // round2 首先验证各个节点发过了r1msg是否正确，保存其他个节点发送过来的paillier 公钥，多项式的承诺， 然后发送两个消息
-// r2msg1: 将本party 通过隐藏多项式 f(x)= a0+a1*x+a2*x^2, x = party[j].key得到的share[j] 点对点的发送Pj
-// r2msg2: 把本party的 [r, g^a0,g^a1,g^a2,...]的commitment.D
+// r2msg1:  并将本party通过隐藏多项式 f(x)= a0+a1*x+a2*x^2, x = party[j].key得到的share[j] 点对点的发送Pj
+// r2msg2: 将本party的 [r, g^a0,g^a1,g^a2,...]的commitment.D
 
 // round3: party[i]
 // 1. 将在r1msg1中收到的party[j]的hash[g^a0, g^a1,....] 和r2msg2 收到的party[j]隐藏多项式[r, g^a0, g^a1, g^a2,....] 生成HashCommitDecommit，并验证
@@ -64,7 +65,7 @@ func (round *round1) Start() *tss.Error {
 	// 2. compute the vss shares
 	// f(x) = a0 + a1*x + a2*x^2 + .... ，随机产生隐藏多项式
 	// vs[0] = g^a0, vs[1] = g^a1, vs[i] = g^ai, 2个 commitment
-	// vs = [g^a0, g^a1, g^a2, ...]
+	// vs = [g^a0, g^a1, g^a2, ...], 产生多项式的承诺
 	// shares = {xi, f(xi)}
 	// 把party[i] 的部分私钥u[i] 通过一个多项式fa(x), 得到shares， shares = [(ids[0] fa(ids[0])), (ids[1],fa(ids[1])), (ids[2],fa(ids[2]))]
 	ids := round.Parties().IDs().Keys()

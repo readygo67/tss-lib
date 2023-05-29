@@ -31,8 +31,8 @@ func (round *round3) Start() *tss.Error {
 	Ps := round.Parties().IDs()
 	PIdx := round.PartyID().Index
 
-	// 1,9. calculate xi， round3 计算出所有参与方都在时候的私钥。
-	// 将其他parties 发过来的shares相加， x_i = f_a(ids[i]) + f_b(ids[i]) + f_c(ids[i]) + f_d(ids[i])
+	// 1,9. calculate xi， round3 计算出所有参与方都在时候的私钥。 x_1 = f_a(1) + f_b(1) + f_c(1) + f_d(1) = 113+17+36+83 = 249      # Alice 计算并保存
+	// 将其他parties 发过来的shares[ids[i]]相加， x_i = f_a(ids[i]) + f_b(ids[i]) + f_c(ids[i]) + f_d(ids[i])
 	xi := new(big.Int).Set(round.temp.shares[PIdx].Share) // 本地产生的share
 	for j := range Ps {
 		if j == PIdx {
@@ -148,7 +148,7 @@ func (round *round3) Start() *tss.Error {
 				// Vc[1] = g^a1 + g^b1 + g^c1 + g^d1，函数之和的一次项系数
 				// Vc[2] = g^a2 + g^b2 + g^c2 + g^d2，函数之和的二次项系数
 
-				Vc[c], err = Vc[c].Add(PjVs[c]) // Vc[i] = g^ai + g^bi + g^ci, 即Vc[j]= Sum(party_i[j]), 因为party_i[j]都在ecdsa的曲线上,所以他们的和也在ecdsa曲线上。如果相加的结果不在ecdsa的曲线上，则判断该party 作恶。
+				Vc[c], err = Vc[c].Add(PjVs[c]) // Vc[i] = g^ai + g^bi + g^ci + ... , 即Vc[j]= Sum(party_i[j]), 因为party_i[j]都在ecdsa的曲线上,所以他们的和也在ecdsa曲线上。如果相加的结果不在ecdsa的曲线上，则判断该party 作恶。
 				if err != nil {
 					culprits = append(culprits, Pj)
 				}
@@ -180,6 +180,7 @@ func (round *round3) Start() *tss.Error {
 			// bigXj 为所有参与方隐藏多项式之和，在对应ids[j]的取值。各个party的 bigXj不同，即bigXj[i] != bigXj[j], 但是作为round.save.BigXj 存的数组是在各个party都是相同的。
 			// bigXj[k] = (g^a0 + g^b0 + g^c0 + g^d0) + (g^a1 + g^b1 + g^c1 + g^d1) * ids[k] + (g^a2 + g^b2 + g^c2 + g^d2) * ids[k]^2
 			// 即: bigXj[0] = (g^a0 + g^b0 + g^c0 + g^d0) + (g^a1 + g^b1 + g^c1 + g^d1)  * ids[0] +  (g^a2 + g^b2 + g^c2 + g^d2) * ids[0]^2
+			// 即: bigXj[1] = (g^a0 + g^b0 + g^c0 + g^d0) + (g^a1 + g^b1 + g^c1 + g^d1)  * ids[1] +  (g^a2 + g^b2 + g^c2 + g^d2) * ids[1]^2
 			bigXj[j] = BigXj
 		}
 		if len(culprits) > 0 {

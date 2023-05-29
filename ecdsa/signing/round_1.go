@@ -80,7 +80,7 @@ func (round *round1) Start() *tss.Error {
 	i := round.PartyID().Index
 	round.ok[i] = true // 本party[i], 这一轮的ok 记为true
 
-	for j, Pj := range round.Parties().IDs() { // partyi 给partyj 发送 mta
+	for j, Pj := range round.Parties().IDs() { // party[i] 给party[j] 发送 mta
 		if j == i {
 			continue
 		}
