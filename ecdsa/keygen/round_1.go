@@ -24,7 +24,11 @@ var (
 
 // round 1 represents round 1 of the keygen part of the GG18 ECDSA TSS spec (Gennaro, Goldfeder; 2018)
 // round1: 广播party[i]产生的paillier 公钥，+ 隐藏多项式的hash[g^a0, g^a1,....], +safePrime的NTildei,H1i,H2i，以及他们的dlnProof。
-// round2: party[i]将为party[j]产生的share[j] p2p发送给party[j], 广播party[i]的隐藏多项式[r, g^a0, g^a1, g^a2,....]
+
+// round2 首先验证各个节点发过了r1msg是否正确，保存其他个节点发送过来的paillier 公钥，多项式的承诺， 然后发送两个消息
+// r2msg1: 将本party 通过隐藏多项式 f(x)= a0+a1*x+a2*x^2, x = party[j].key得到的share[j] 点对点的发送Pj
+// r2msg2: 把本party的 [r, g^a0,g^a1,g^a2,...]的commitment.D
+
 // round3: party[i]
 // 1. 将在r1msg1中收到的party[j]的hash[g^a0, g^a1,....] 和r2msg2 收到的party[j]隐藏多项式[r, g^a0, g^a1, g^a2,....] 生成HashCommitDecommit，并验证
 // 2. 将party[j] 通过 r2msg1中发来的share[i]，和party[j]通过r2msg2中发过来的生成多项式[g^a0, g^a1, g^a2,....] 验证。
@@ -32,7 +36,9 @@ var (
 // 4. 计算bigXj 为各参与方隐藏多项式之和，在对应ids[j]的取值。各个party的bigXj相同
 // 4. 计算得到公钥
 // 5. 产生(ids[i], ecdsaPubkey)的paillier证明，并广播出去
+
 // round4: 验证每个party 产生的 (ids[i], ecdsaPubkey) paillier证明是否正确，如果正确将结束DKG的过程。
+
 func newRound1(params *tss.Parameters, save *LocalPartySaveData, temp *localTempData, out chan<- tss.Message, end chan<- LocalPartySaveData) tss.Round {
 	return &round1{
 		&base{params, save, temp, out, end, make([]bool, len(params.Parties().IDs())), false, 1}}
@@ -60,7 +66,7 @@ func (round *round1) Start() *tss.Error {
 	// vs[0] = g^a0, vs[1] = g^a1, vs[i] = g^ai, 2个 commitment
 	// vs = [g^a0, g^a1, g^a2, ...]
 	// shares = {xi, f(xi)}
-	// 把party[i] 的部分私钥u[i] 通过一个多项式fa(x), 得到shares， shares = [(ids[0] f_a(ids[0])), (ids[1],fa(ids[1])), (ids[2],fa(ids[2]))]
+	// 把party[i] 的部分私钥u[i] 通过一个多项式fa(x), 得到shares， shares = [(ids[0] fa(ids[0])), (ids[1],fa(ids[1])), (ids[2],fa(ids[2]))]
 	ids := round.Parties().IDs().Keys()
 	vs, shares, err := vss.Create(round.Params().EC(), round.Threshold(), ui, ids)
 	if err != nil {
@@ -79,7 +85,7 @@ func (round *round1) Start() *tss.Error {
 		return round.WrapError(err, Pi)
 	}
 
-	// 将vs[0] = g ^a0, vs[1] = g^a1, 变成 变成[]*big.Int数组 再做一个commitment.
+	// 将vs[0] = g ^a0, vs[1] = g^a1,  变成[]*big.Int数组 再做一个commitment.
 	// pGFlat = [r, vs[0], vs[1], vs[2].....] cmt.C = hash(r, vs[0], vs[1], ...), cmt.D = [r, vs[0], vs[1], ...]
 	cmt := cmts.NewHashCommitment(pGFlat...)
 

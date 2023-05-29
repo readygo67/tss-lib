@@ -45,7 +45,7 @@ func (round *round3) Start() *tss.Error {
 	round.save.Xi = new(big.Int).Mod(xi, round.Params().EC().Params().N) // Xi = f_a(ids[i]) + f_b(ids[i]) + f_c(ids[i]) + f_d(ids[i])
 
 	// 2-3.
-	Vc := make(vss.Vs, round.Threshold()+1) // 因为threshold+1能重构密钥，隐藏多项式，对隐藏多项式求和。
+	Vc := make(vss.Vs, round.Threshold()+1) // 因为threshold+1能重构密钥的隐藏多项式，对隐藏多项式求和。
 	for c := range Vc {                     // c = 0，..., len(vc)
 		Vc[c] = round.temp.vs[c] // 获取本地隐藏多项式[g^a0, g^a1, ...]各项的值。Vc[0] = g^a0, Vc[1] = g^a1, Vc[2] = g^a2
 	}
@@ -81,7 +81,7 @@ func (round *round3) Start() *tss.Error {
 				return
 			}
 
-			PjVs, err := crypto.UnFlattenECPoints(round.Params().EC(), flatPolyGs) // PjVs = party[j]的隐藏多项式 [g^a0, g^a1, ....]
+			PjVs, err := crypto.UnFlattenECPoints(round.Params().EC(), flatPolyGs) // PjVs = party[j]的隐藏多项式 [g^a0, g^a1, ....]，将flatPolyGs中的数组变成EC曲线上的点
 			if err != nil {
 				ch <- vssOut{err, nil}
 				return
@@ -148,7 +148,7 @@ func (round *round3) Start() *tss.Error {
 				// Vc[1] = g^a1 + g^b1 + g^c1 + g^d1，函数之和的一次项系数
 				// Vc[2] = g^a2 + g^b2 + g^c2 + g^d2，函数之和的二次项系数
 
-				Vc[c], err = Vc[c].Add(PjVs[c]) // Vc[i] = g^ai + g^bi + g^ci, 即Vc[j]= Sum(party_i[j]), 因为party_i[j]都在ecdsa的曲线上所有，他们的和也在ecdsa曲线上。如果相加的结果不在ecdsa的曲线上，则判断该party 作恶。
+				Vc[c], err = Vc[c].Add(PjVs[c]) // Vc[i] = g^ai + g^bi + g^ci, 即Vc[j]= Sum(party_i[j]), 因为party_i[j]都在ecdsa的曲线上,所以他们的和也在ecdsa曲线上。如果相加的结果不在ecdsa的曲线上，则判断该party 作恶。
 				if err != nil {
 					culprits = append(culprits, Pj)
 				}
@@ -177,7 +177,7 @@ func (round *round3) Start() *tss.Error {
 					culprits = append(culprits, Pj)
 				}
 			}
-			// bigXj 为各参与方隐藏多项式之和，在对应ids[j]的取值。各个party的bigXj相同
+			// bigXj 为所有参与方隐藏多项式之和，在对应ids[j]的取值。各个party的 bigXj不同，即bigXj[i] != bigXj[j], 但是作为round.save.BigXj 存的数组是在各个party都是相同的。
 			// bigXj[k] = (g^a0 + g^b0 + g^c0 + g^d0) + (g^a1 + g^b1 + g^c1 + g^d1) * ids[k] + (g^a2 + g^b2 + g^c2 + g^d2) * ids[k]^2
 			// 即: bigXj[0] = (g^a0 + g^b0 + g^c0 + g^d0) + (g^a1 + g^b1 + g^c1 + g^d1)  * ids[0] +  (g^a2 + g^b2 + g^c2 + g^d2) * ids[0]^2
 			bigXj[j] = BigXj

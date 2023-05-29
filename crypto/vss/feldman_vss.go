@@ -90,13 +90,13 @@ func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.In
 	fmt.Printf("poly:%v\n", poly)
 
 	for i, ai := range poly {
-		v[i] = crypto.ScalarBaseMult(ec, ai) // c0 = g^a0, c1=g^a1, ....
+		v[i] = crypto.ScalarBaseMult(ec, ai) // c0 = g^a0, c1=g^a1, ....，这是多项式的承诺
 	}
 
 	shares := make(Shares, num)
 	for i := 0; i < num; i++ {
-		share := evaluatePolynomial(ec, threshold, poly, ids[i])           // yi = a0+ a1 * xi + a2 *xi^2 +...,
-		shares[i] = &Share{Threshold: threshold, ID: ids[i], Share: share} // ids[i] 为多项式中的xi，share 为多项式中的yi,得到party[i]部分私钥u[i]的多项式隐藏shares
+		share := evaluatePolynomial(ec, threshold, poly, ids[i])           // yi = a0+ a1 * xi + a2 *xi^2 +..., 用每个参与者的id作为输入，对多项式求值，
+		shares[i] = &Share{Threshold: threshold, ID: ids[i], Share: share} // 将第i个参与方的id作为输入的多项式的值发给第i个参与方
 	}
 
 	// v的数量是threshold+1, 是隐藏多项式系数的commitment
@@ -106,7 +106,7 @@ func Create(ec elliptic.Curve, threshold int, secret *big.Int, indexes []*big.In
 
 // 每一个share验证自己share的有效性，
 // vs[i] = c[i] //commitment， c[i] = g^ai，vs= 隐藏多项式[g^a0, g^a1, .....],share = (ids[i], share)
-// vs[i] = g^a0, vs 是隐藏多项式[f(x)=a0 +a1*x +a2+x^2]系数[a0,a1,a2...]的隐藏[g^a0, g^a1, .....], share = {threshold, party[i]的key, f(key)}
+// vs[0] = g^a0，.... vs[i]= g^ai, vs 是隐藏多项式[f(x)=a0 +a1*x +a2+x^2]系数[a0,a1,a2...]的隐藏[g^a0, g^a1, .....], share = {threshold, party[i]的key, f(key)}
 // Verify 函数验证 g^f(x) = g^(a0+a1*x + a2*x^2 + a3*x^3+....)。
 func (share *Share) Verify(ec elliptic.Curve, threshold int, vs Vs) bool {
 	if share.Threshold != threshold || vs == nil {
@@ -167,7 +167,7 @@ func (shares Shares) ReConstruct(ec elliptic.Curve) (secret *big.Int, err error)
 	return secret, nil
 }
 
-// 随机产生多项式y = a0+a1*x +a2 *x^2 + a3 *x^3 + ... 中的系数， a0 = secret, a1 = 随机产生的系数,
+// 随机产生多项式y = a0+a1*x +a2 *x^2 + a3 *x^3 + ... 中的系数， a0 = 部分私钥secret, a1,a2,.... = 随机产生的系数,
 // 返回的是一个[a0, a1, a2, a3]
 func samplePolynomial(ec elliptic.Curve, threshold int, secret *big.Int) []*big.Int {
 	// q := ec.Params().N

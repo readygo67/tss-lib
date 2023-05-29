@@ -116,12 +116,12 @@ func (publicKey *PublicKey) EncryptAndReturnRandomness(m *big.Int) (c *big.Int, 
 	}
 	x = common.GetRandomPositiveRelativelyPrimeInt(publicKey.N)
 	N2 := publicKey.NSquare()
-	// 1. gamma^m mod N2, Gm = (1+N)^m
+	// 1. gamma^m mod N2, Gm = (1+N)^m, 对消息m 加密
 	Gm := new(big.Int).Exp(publicKey.Gamma(), m, N2)
 	// 2. x^N mod N2, xN = x^N
 	xN := new(big.Int).Exp(x, publicKey.N, N2)
 	// 3. (1) * (2) mod N2
-	c = common.ModInt(N2).Mul(Gm, xN) // C=(g^a * r^n)modn^2
+	c = common.ModInt(N2).Mul(Gm, xN) // C=(g^m * r^n)modn^2
 	return
 }
 
@@ -143,7 +143,7 @@ func (publicKey *PublicKey) HomoMult(m, c1 *big.Int) (*big.Int, error) {
 	return common.ModInt(N2).Exp(c1, m), nil
 }
 
-// 密文与密文的的加法 等于
+// 密文与密文的的加法
 func (publicKey *PublicKey) HomoAdd(c1, c2 *big.Int) (*big.Int, error) {
 	N2 := publicKey.NSquare()
 	if c1.Cmp(zero) == -1 || c1.Cmp(N2) != -1 { // c1 < 0 || c1 >= N2 ?

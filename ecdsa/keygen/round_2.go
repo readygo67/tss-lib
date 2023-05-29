@@ -19,7 +19,7 @@ const (
 	paillierBitsLen = 2048
 )
 
-// round2 首先验证各个节点发过了r1msg是否正确，然后发送两个消息
+// round2 首先验证各个节点发过了r1msg是否正确，保存其他个节点发送过来的paillier 公钥，多项式的承诺， 然后发送两个消息
 // r2msg1: 将本party 通过隐藏多项式 f(x)= a0+a1*x+a2*x^2, x = party[j].key得到的share[j] 点对点的发送Pj
 // r2msg2: 把本party的 [r, g^a0,g^a1,g^a2,...]的commitment.D
 
