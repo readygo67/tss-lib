@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/ipfs/go-log"
 	"github.com/stretchr/testify/assert"
@@ -190,6 +191,7 @@ func TestE2EConcurrentAndSaveFixtures(t *testing.T) {
 	startGR := runtime.NumGoroutine()
 
 	// init the parties
+	start := time.Now()
 	for i := 0; i < len(pIDs); i++ {
 		var P *LocalParty
 		params := tss.NewParameters(p2pCtx, pIDs[i], len(pIDs), threshold)
@@ -317,6 +319,8 @@ keygen:
 					assert.Equal(t, pkY, Pj.data.ECDSAPub.Y())
 				}
 				t.Log("Public key distribution test done.")
+
+				t.Logf("calculate final sig takes %d millseconds", time.Since(start).Milliseconds())
 
 				// test sign/verify
 				data := make([]byte, 32)

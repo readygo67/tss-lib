@@ -67,6 +67,7 @@ func LoadKeygenTestFixtures(qty int, optionalStart ...int) ([]LocalPartySaveData
 func LoadKeygenTestFixturesRandomSet(qty, fixtureCount int) ([]LocalPartySaveData, tss.SortedPartyIDs, error) {
 	keys := make([]LocalPartySaveData, 0, qty)
 	plucked := make(map[int]interface{}, qty)
+	// TODO(keep),随机选择
 	for i := 0; len(plucked) < qty; i = (i + 1) % fixtureCount {
 		_, have := plucked[i]
 		if pluck := rand.Float32() < 0.5; !have && pluck {

@@ -69,6 +69,7 @@ func TestE2EConcurrent(t *testing.T) {
 	updater := test.SharedPartyUpdater
 
 	// init the parties
+	start := time.Now()
 	msg := common.GetRandomPrimeInt(256)
 	for i := 0; i < len(signPIDs); i++ {
 		params := tss.NewParameters(p2pCtx, signPIDs[i], len(signPIDs), threshold)
@@ -143,7 +144,7 @@ signing:
 				btcecSig := &btcec.Signature{R: r, S: sumS}
 				btcecSig.Verify(msg.Bytes(), (*btcec.PublicKey)(&pk))
 				assert.True(t, ok, "ecdsa verify 2 must pass")
-
+				t.Logf("calculate final sig takes %d millseconds", time.Since(start).Milliseconds())
 				t.Log("ECDSA signing test done.")
 				// END ECDSA verify
 
@@ -280,6 +281,139 @@ preparing:
 
 	t.Log("ECDSA signing test done.")
 }
+
+func TestE2EConcurrentOneRound1(t *testing.T) {
+	setUp("info")
+	threshold := testThreshold
+
+	// PHASE: load keygen fixtures
+	keys, signPIDs, err := keygen.LoadKeygenTestFixturesRandomSet(testThreshold+1, testParticipants)
+	var ourOneRoundData *SignatureData_OneRoundData
+	otherOneRoundData := make(map[*tss.PartyID]*SignatureData_OneRoundData)
+	assert.NoError(t, err, "should load keygen fixtures")
+	assert.Equal(t, testThreshold+1, len(keys))
+	assert.Equal(t, testThreshold+1, len(signPIDs))
+
+	// PHASE: signing
+	// use a shuffled selection of the list of parties for this test
+	p2pCtx := tss.NewPeerContext(signPIDs)
+	parties := make([]*LocalParty, 0, len(signPIDs))
+
+	errCh := make(chan *tss.Error, len(signPIDs))
+	outCh := make(chan tss.Message, len(signPIDs))
+	endChs := make([]chan *SignatureData, len(signPIDs))
+	dataCh := make(chan signatureDataWithPartyId, len(signPIDs))
+
+	updater := test.SharedPartyUpdater
+
+	// init the parties
+	for i := 0; i < len(signPIDs); i++ {
+		params := tss.NewParameters(p2pCtx, signPIDs[i], len(signPIDs), threshold)
+
+		endChs[i] = make(chan *SignatureData, 1)
+		P := NewLocalParty(nil, params, keys[i], outCh, endChs[i]).(*LocalParty)
+		parties = append(parties, P)
+		go func(P *LocalParty) {
+			if err := P.Start(); err != nil {
+				errCh <- err
+			}
+		}(P)
+	}
+
+	var ended int32
+	for i, endCh := range endChs {
+		go func(ch chan *SignatureData, partyId *tss.PartyID) {
+			for data := range ch {
+				dataCh <- signatureDataWithPartyId{
+					signData: data,
+					partyId:  partyId,
+				}
+				break
+			}
+		}(endCh, signPIDs[i])
+	}
+preparing:
+	for {
+		fmt.Printf("ACTIVE GOROUTINES: %d\n", runtime.NumGoroutine())
+		select {
+		case err := <-errCh:
+			common.Logger.Errorf("Error: %s", err)
+			assert.FailNow(t, err.Error())
+			break preparing
+
+		case msg := <-outCh:
+			dest := msg.GetTo()
+			if dest == nil {
+				for _, P := range parties {
+					if P.PartyID().Index == msg.GetFrom().Index {
+						continue
+					}
+					go updater(P, msg, errCh)
+				}
+			} else {
+				if dest[0].Index == msg.GetFrom().Index {
+					t.Fatalf("party %d tried to send a message to itself (%d)", dest[0].Index, msg.GetFrom().Index)
+				}
+				go updater(parties[dest[0].Index], msg, errCh)
+			}
+
+		case data := <-dataCh:
+			for i, pid := range signPIDs {
+				if pid.Id == data.partyId.Id {
+					if i == 0 {
+						ourOneRoundData = data.signData.OneRoundData
+					} else {
+						otherOneRoundData[signPIDs[i]] = data.signData.OneRoundData
+					}
+					break
+				}
+			}
+			atomic.AddInt32(&ended, 1)
+			if atomic.LoadInt32(&ended) == int32(len(signPIDs)) {
+				t.Logf("Done. Received signature data from %d participants %+v", ended, data)
+				break preparing
+			}
+		}
+	}
+
+	// Simulate offline round
+	msg := []byte("hello, world")
+	hash := common.SHA512_256(msg)
+	bigHash := big.NewInt(0).SetBytes(hash)
+	otherSis := make(map[*tss.PartyID]*big.Int)
+	ourSi := FinalizeGetOurSigShare(ourOneRoundData, bigHash)
+	for partyId, data := range otherOneRoundData {
+		start := time.Now()
+		si := FinalizeGetOurSigShare(data, bigHash)
+		t.Logf("compose si takes %d microseconds", time.Since(start).Microseconds())
+		otherSis[partyId] = si
+	}
+
+	// compose final signature
+	pkX, pkY := keys[0].ECDSAPub.X(), keys[0].ECDSAPub.Y()
+	pk := ecdsa.PublicKey{
+		Curve: tss.EC(),
+		X:     pkX,
+		Y:     pkY,
+	}
+	start := time.Now()
+	t.Logf("before FinalizeGetAndVerifyFinalSig, time:%v", time.Now())
+	_, sig, finalErr := FinalizeGetAndVerifyFinalSig(&SignatureData{OneRoundData: ourOneRoundData}, &pk, bigHash, signPIDs[0], ourSi, otherSis)
+	t.Logf("calculate final sig takes %d microseconds", time.Since(start).Microseconds())
+	t.Logf("after FinalizeGetAndVerifyFinalSig, time:%v", time.Now())
+	assert.Nil(t, finalErr, "final signature generation should have no error")
+
+	// BEGIN ECDSA verify
+	ok := ecdsa.Verify(&pk, bigHash.Bytes(), sig.R, sig.S)
+	assert.True(t, ok, "ecdsa verify must pass")
+
+	btcecSig := &btcec.Signature{R: sig.R, S: sig.S}
+	btcecSig.Verify(bigHash.Bytes(), (*btcec.PublicKey)(&pk))
+	assert.True(t, ok, "ecdsa verify 2 must pass")
+
+	t.Log("ECDSA signing test done.")
+}
+
 func TestE2EConcurrentAbort7(t *testing.T) {
 	setUp("info")
 	threshold := testThreshold
